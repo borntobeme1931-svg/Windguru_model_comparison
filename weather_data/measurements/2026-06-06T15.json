@@ -1,0 +1,10 @@
+{
+  "source": "Open-Meteo fallback (lat=47.113, lon=7.224)",
+  "obs_time_utc": "2026-06-06T14:00:00+00:00",
+  "hour_key": "2026-06-06T14",
+  "wind_speed_kn": 7.7,
+  "wind_gust_kn": 17.1,
+  "wind_dir_deg": 242.0,
+  "temp_c": 21.9,
+  "precip_mm": 0.0
+}
