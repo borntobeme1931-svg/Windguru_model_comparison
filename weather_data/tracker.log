@@ -119,3 +119,28 @@ Wassertemperatur: 19.9°C
 © 2026 meteoBase.ch - Version v73 light
 2026-06-06 16:12:10,583  WARNING     WSA-Ipsach Playwright: no usable values found.
 2026-06-06 16:12:10,583  ERROR       ✗ Could not retrieve any measurement.
+2026-06-06 16:18:17,892  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-06 16:18:18,809  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-06 16:18:28,058  INFO        ✓ Got forecast via Playwright (28 models)
+2026-06-06 16:18:28,058  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'TMP', 'TCDC', 'APCP1', 'GUST', 'FLHGT', 'SLP', 'HCDC', 'MCDC', 'LCDC', 'RH']
+2026-06-06 16:18:28,060  INFO        Parsed 61 hourly forecast records across 1 model block(s).
+2026-06-06 16:18:28,061  INFO        Appended 61 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-06 16:18:28,061  INFO      Fetching WSA-Ipsach measurement …
+2026-06-06 16:18:34,805  WARNING     WSA-Ipsach: only 1 field(s) found. Page text:
+WSA-Ipsach
+
+06.06.2026 (CEST) 18:16 :: 440müM
+
+Wind-10min-Ø: 16.9km/h (9.1kn, 3Bf) WSW
+Wind-10min-Max: 21.2km/h (11.4kn, 3Bf) WSW
+Gust-Factor (GF): 1.5 / Richtungstreue: 97%
+Wassertemperatur: 19.9°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-06 16:18:34,867  WARNING     WSA-Ipsach Playwright: no usable values found.
+2026-06-06 16:18:34,868  ERROR       ✗ Could not retrieve any measurement.
