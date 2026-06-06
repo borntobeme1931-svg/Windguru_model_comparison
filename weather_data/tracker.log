@@ -248,3 +248,29 @@ Wassertemperatur: 20.0°C
 2026-06-06 16:52:38,514  INFO        WSA tokens: ws=10.1(km/h) wg=11.9(km/h) wd=None tc=None rr=None
 2026-06-06 16:52:38,514  INFO        ✓ WSA-Ipsach: wind=5.45 kn gust=6.43 kn dir=None (None°) temp=None°C
 2026-06-06 16:52:38,514  INFO        Measurement for 2026-06-06T16 already recorded — skipping.
+2026-06-06 19:57:26,897  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-06 19:57:27,645  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-06 19:57:37,006  INFO        ✓ Got forecast via Playwright (29 models)
+2026-06-06 19:57:37,006  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'TMP', 'TCDC', 'APCP', 'APCP1', 'GUST', 'FLHGT', 'SLP', 'HCDC', 'MCDC', 'LCDC']
+2026-06-06 19:57:37,008  INFO        Parsed 76 hourly forecast records across 1 model block(s).
+2026-06-06 19:57:37,008  INFO        Appended 76 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-06 19:57:37,008  INFO      Fetching WSA-Ipsach measurement …
+2026-06-06 19:57:44,838  INFO        WSA-Ipsach page text:
+WSA-Ipsach
+
+06.06.2026 (CEST) 21:56 :: 440müM
+
+Wind-10min-Ø: 16.6km/h (9kn, 3Bf) W
+Wind-10min-Max: 29.5km/h (15.9kn, 3Bf) WNW
+Gust-Factor (GF): 3.6 / Richtungstreue: 94%
+Wassertemperatur: 19.8°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-06 19:57:44,838  INFO        WSA tokens: ws=16.6(km/h) wg=29.5(km/h) wd=None tc=None rr=None
+2026-06-06 19:57:44,839  INFO        ✓ WSA-Ipsach: wind=8.96 kn gust=15.93 kn dir=None (None°) temp=None°C
+2026-06-06 19:57:44,839  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
