@@ -71,11 +71,15 @@ def utc_now() -> datetime:
 def hour_key(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H")
 
+def month_key(dt: datetime) -> str:
+    """YYYY-MM — used to name monthly files."""
+    return dt.strftime("%Y-%m")
+
 def forecast_file(run_time: datetime) -> Path:
-    return FORECASTS_DIR / f"{hour_key(run_time)}.json"
+    return FORECASTS_DIR / f"{month_key(run_time)}.jsonl"
 
 def measurement_file(obs_time: datetime) -> Path:
-    return MEASUREMENTS_DIR / f"{hour_key(obs_time)}.json"
+    return MEASUREMENTS_DIR / f"{month_key(obs_time)}.jsonl"
 
 def _safe(lst, i):
     try:
@@ -240,14 +244,16 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
 
 
 def save_forecasts(records: list[dict], run_time: datetime) -> None:
+    """Append forecast records to the monthly JSONL file (one JSON object per line)."""
     fp = forecast_file(run_time)
-    payload = {
+    entry = {
         "fetch_time_utc": run_time.isoformat(),
         "spot_id":        WINDGURU_SPOT_ID,
         "records":        records,
     }
-    fp.write_text(json.dumps(payload, indent=2))
-    log.info("  Saved %d forecast records → %s", len(records), fp)
+    with fp.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    log.info("  Appended %d forecast records → %s", len(records), fp)
 
 
 # ── 2. WSA-Ipsach measurements ───────────────────────────────────────────────
@@ -459,10 +465,25 @@ def _fetch_open_meteo() -> dict | None:
 
 
 def save_measurement(obs: dict) -> None:
+    """Append measurement to the monthly JSONL file. Skips if this hour already recorded."""
     now = utc_now()
     fp  = measurement_file(now)
-    fp.write_text(json.dumps(obs, indent=2))
-    log.info("  Saved measurement → %s", fp)
+    hk  = hour_key(now)
+
+    # Avoid duplicate entries: skip if this hour is already in the file
+    if fp.exists():
+        with fp.open("r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    if json.loads(line).get("hour_key") == hk:
+                        log.info("  Measurement for %s already recorded — skipping.", hk)
+                        return
+                except Exception:
+                    pass
+
+    with fp.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(obs) + "\n")
+    log.info("  Appended measurement → %s", fp)
 
 
 # ── 3. Collection entry-point ─────────────────────────────────────────────────
@@ -484,10 +505,19 @@ def collect() -> None:
 # ── 4. Analysis ───────────────────────────────────────────────────────────────
 
 def load_all_forecasts() -> pd.DataFrame:
+    """Load all forecast records from monthly JSONL files."""
     rows = []
-    for fp in sorted(FORECASTS_DIR.glob("*.json")):
-        payload = json.loads(fp.read_text())
-        rows.extend(payload["records"])
+    for fp in sorted(FORECASTS_DIR.glob("*.jsonl")):
+        with fp.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                    rows.extend(payload.get("records", []))
+                except Exception:
+                    pass
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
@@ -497,9 +527,18 @@ def load_all_forecasts() -> pd.DataFrame:
 
 
 def load_all_measurements() -> pd.DataFrame:
+    """Load all measurements from monthly JSONL files."""
     rows = []
-    for fp in sorted(MEASUREMENTS_DIR.glob("*.json")):
-        rows.append(json.loads(fp.read_text()))
+    for fp in sorted(MEASUREMENTS_DIR.glob("*.jsonl")):
+        with fp.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    pass
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
