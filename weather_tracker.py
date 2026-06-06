@@ -22,7 +22,6 @@ import argparse
 import json
 import logging
 import math
-import os
 import re
 import sys
 import time
@@ -33,7 +32,7 @@ import requests
 import pandas as pd
 from tabulate import tabulate
 
-# ── optional browser import (only needed for Windguru scraping) ─────────────
+# ── optional browser import ──────────────────────────────────────────────────
 try:
     from playwright.sync_api import sync_playwright
     PLAYWRIGHT_AVAILABLE = True
@@ -43,23 +42,13 @@ except ImportError:
 # ── configuration ────────────────────────────────────────────────────────────
 
 WINDGURU_SPOT_ID = 56996
-WINDGURU_URL     = f"https://www.windguru.cz/{WINDGURU_SPOT_ID}"
+STATION_LAT      = 47.113
+STATION_LON      = 7.224
 
-# WSA-Ipsach station coordinates (Lake Biel, close to Windguru spot)
-STATION_LAT = 47.113
-STATION_LON = 7.224
-
-# All Windguru model slugs that typically appear for Swiss inland spots.
-# The scraper will discover whatever models are actually shown on the page.
-KNOWN_MODELS = [
-    "WG", "GFS", "GFS HD", "ECMWF", "ICON", "AROME", "HARMONIE",
-    "ICON-D2", "GDPS", "NAM"
-]
-
-DATA_DIR = Path("weather_data")
-FORECASTS_DIR = DATA_DIR / "forecasts"
-MEASUREMENTS_DIR = DATA_DIR / "measurements"
-ANALYSIS_DIR = DATA_DIR / "analysis"
+DATA_DIR          = Path("weather_data")
+FORECASTS_DIR     = DATA_DIR / "forecasts"
+MEASUREMENTS_DIR  = DATA_DIR / "measurements"
+ANALYSIS_DIR      = DATA_DIR / "analysis"
 
 for d in [FORECASTS_DIR, MEASUREMENTS_DIR, ANALYSIS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
@@ -80,7 +69,6 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 def hour_key(dt: datetime) -> str:
-    """YYYY-MM-DDTHH (UTC, hour-truncated) – used as the primary time key."""
     return dt.strftime("%Y-%m-%dT%H")
 
 def forecast_file(run_time: datetime) -> Path:
@@ -89,15 +77,27 @@ def forecast_file(run_time: datetime) -> Path:
 def measurement_file(obs_time: datetime) -> Path:
     return MEASUREMENTS_DIR / f"{hour_key(obs_time)}.json"
 
+def _safe(lst, i):
+    try:
+        v = lst[i]
+        return float(v) if v is not None else None
+    except (IndexError, TypeError, ValueError):
+        return None
+
+def _float(v) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+def _to_knots_from_kmh(kmh) -> float | None:
+    v = _float(kmh)
+    return round(v / 1.852, 2) if v is not None else None
+
+
 # ── 1. Windguru forecast scraping ────────────────────────────────────────────
 
 def _windguru_internal_api(spot_id: int) -> dict | None:
-    """
-    Attempt to hit Windguru's internal forecast endpoint directly.
-    Returns parsed JSON or None if it fails.
-    """
-    # Windguru uses a PHP API that is called client-side.
-    # The salt/hash changes per session, so we first fetch the page to get them.
     session = requests.Session()
     session.headers.update({
         "User-Agent": (
@@ -110,7 +110,6 @@ def _windguru_internal_api(spot_id: int) -> dict | None:
         page_resp = session.get(f"https://www.windguru.cz/{spot_id}", timeout=15)
         page_resp.raise_for_status()
 
-        # Extract the 'uid' / salt used in the hash
         uid_match = re.search(r'"uid"\s*:\s*"([^"]+)"', page_resp.text)
         salt = uid_match.group(1) if uid_match else str(int(time.time()))
 
@@ -132,20 +131,15 @@ def _windguru_internal_api(spot_id: int) -> dict | None:
             timeout=20,
         )
         api_resp.raise_for_status()
-        data = api_resp.json()
-        return data
+        return api_resp.json()
     except Exception as exc:
         log.warning("Internal API call failed: %s", exc)
         return None
 
 
 def _windguru_playwright(spot_id: int) -> dict | None:
-    """
-    Fall-back: launch a headless browser, wait for Windguru to render,
-    then intercept the forecast XHR to get the raw JSON payload.
-    """
     if not PLAYWRIGHT_AVAILABLE:
-        log.error("Playwright not installed. Run:  pip install playwright && playwright install chromium")
+        log.error("Playwright not installed.")
         return None
 
     captured: dict | None = None
@@ -165,17 +159,13 @@ def _windguru_playwright(spot_id: int) -> dict | None:
 
         page.on("response", handle_response)
         page.goto(f"https://www.windguru.cz/{spot_id}", timeout=30_000)
-        page.wait_for_timeout(8_000)   # let JS load all models
+        page.wait_for_timeout(8_000)
         browser.close()
 
     return captured
 
 
 def fetch_windguru_forecasts(spot_id: int = WINDGURU_SPOT_ID) -> dict | None:
-    """
-    Returns the raw Windguru forecast JSON (all models) or None on failure.
-    Tries the lightweight API first, then falls back to headless browser.
-    """
     log.info("Fetching Windguru forecasts for spot %s …", spot_id)
     data = _windguru_internal_api(spot_id)
     if data and "fcst" in data:
@@ -191,31 +181,19 @@ def fetch_windguru_forecasts(spot_id: int = WINDGURU_SPOT_ID) -> dict | None:
 
 
 def parse_windguru_forecasts(raw: dict) -> list[dict]:
-    """
-    Convert the raw Windguru JSON into a flat list of hourly records:
-        {model, valid_time_utc, hour_key, wind_speed_kn, wind_gust_kn,
-         wind_dir_deg, temp_c, precip_mm, lead_hours}
-    lead_hours = how many hours ahead the forecast is from the model run time.
-    """
     records = []
     fcst_raw = raw.get("fcst", {})
 
-    # Windguru returns "fcst" either as a dict {model_id: {...}} or a list
-    # [{model_name:..., ...}, ...] depending on how the data was captured.
     if isinstance(fcst_raw, list):
         fcst_block = {str(i): m for i, m in enumerate(fcst_raw) if isinstance(m, dict)}
     elif isinstance(fcst_raw, dict):
-        # Values may themselves be dicts or scalars; keep only dict values
         fcst_block = {k: v for k, v in fcst_raw.items() if isinstance(v, dict)}
     else:
         fcst_block = {}
 
-    # Model run offset: Windguru stores forecast hours as offsets from
-    # a reference timestamp per model.
     for model_id, model_data in fcst_block.items():
         model_name = model_data.get("model_name") or model_data.get("name") or model_id
-        timestamps = model_data.get("fcst_hour_idx", [])  # epoch seconds per step
-        hours      = model_data.get("hours", [])          # hour-of-day (optional)
+        timestamps = model_data.get("fcst_hour_idx", [])
 
         wind_speed = model_data.get("WINDSPD", [])
         wind_gust  = model_data.get("GUST",    [])
@@ -223,7 +201,6 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
         temp       = model_data.get("TMP",     [])
         precip     = model_data.get("APCP",    [])
 
-        # init_timestamp: when was this model run initialised
         init_ts = model_data.get("init_d", None)
         try:
             init_dt = datetime.fromtimestamp(float(init_ts), tz=timezone.utc)
@@ -238,7 +215,7 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
 
             lead = int((valid_dt - init_dt).total_seconds() / 3600)
             if lead > 5 * 24:
-                continue  # beyond 5-day window
+                continue
 
             records.append({
                 "model":          model_name,
@@ -257,16 +234,9 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
              len(records), len(fcst_block))
     if not records:
         log.warning("  No records parsed. Top-level keys: %s", list(raw.keys()))
-        log.warning("  fcst type: %s, sample: %s", type(raw.get("fcst")).__name__, str(raw.get("fcst"))[:300])
+        log.warning("  fcst type: %s, sample: %s",
+                    type(raw.get("fcst")).__name__, str(raw.get("fcst"))[:300])
     return records
-
-
-def _safe(lst, i):
-    try:
-        v = lst[i]
-        return float(v) if v is not None else None
-    except (IndexError, TypeError, ValueError):
-        return None
 
 
 def save_forecasts(records: list[dict], run_time: datetime) -> None:
@@ -283,15 +253,9 @@ def save_forecasts(records: list[dict], run_time: datetime) -> None:
 # ── 2. WSA-Ipsach measurements ───────────────────────────────────────────────
 
 def fetch_meteobase_measurement() -> dict | None:
-    """
-    The wsa-ipsach.meteobase.ch site is powered by meteoBase.ch.
-    It exposes a lightweight PHP endpoint that returns current sensor data.
-    We try two known URL patterns.  If both fail we fall back to the
-    open MeteoSwiss data API (data.geo.admin.ch) for the nearest station.
-    """
     log.info("Fetching WSA-Ipsach measurement …")
 
-    # ── attempt 1: meteoBase JSON endpoint ──────────────────────────────────
+    # ── attempt 1: direct JSON endpoint ─────────────────────────────────────
     for url in [
         "https://wsa-ipsach.meteobase.ch/api/data.php?format=json",
         "https://wsa-ipsach.meteobase.ch/data.php?format=json",
@@ -304,19 +268,19 @@ def fetch_meteobase_measurement() -> dict | None:
                 data = r.json()
                 parsed = _parse_meteobase_json(data)
                 if parsed:
-                    log.info("  ✓ Got meteoBase measurement via %s", url)
+                    log.info("  ✓ Got measurement via JSON endpoint: %s", url)
                     return parsed
         except Exception as exc:
-            log.debug("  meteoBase attempt failed (%s): %s", url, exc)
+            log.debug("  JSON endpoint failed (%s): %s", url, exc)
 
-    # ── attempt 2: meteoBase HTML scrape (lightweight) ───────────────────────
-    parsed = _scrape_meteobase_html()
+    # ── attempt 2: Playwright headless scrape ────────────────────────────────
+    parsed = _scrape_wsa_playwright()
     if parsed:
         return parsed
 
-    # ── attempt 3: MeteoSwiss open data API (nearest station BIE/Biel) ───────
-    log.info("  ↳ Falling back to MeteoSwiss open data for Biel/Bienne …")
-    parsed = _fetch_meteoswiss_opendata()
+    # ── attempt 3: Open-Meteo fallback ───────────────────────────────────────
+    log.info("  ↳ Falling back to Open-Meteo at WSA-Ipsach coordinates …")
+    parsed = _fetch_open_meteo()
     if parsed:
         return parsed
 
@@ -325,11 +289,10 @@ def fetch_meteobase_measurement() -> dict | None:
 
 
 def _parse_meteobase_json(data: dict) -> dict | None:
-    """Extract wind / temp / precip from meteoBase JSON (format may vary)."""
     try:
         now = utc_now()
         return {
-            "source":        "wsa-ipsach.meteobase.ch",
+            "source":        "wsa-ipsach.meteobase.ch (json)",
             "obs_time_utc":  now.isoformat(),
             "hour_key":      hour_key(now),
             "wind_speed_kn": _to_knots_from_kmh(data.get("wind_speed") or data.get("ws")),
@@ -342,147 +305,156 @@ def _parse_meteobase_json(data: dict) -> dict | None:
         return None
 
 
-def _scrape_meteobase_html() -> dict | None:
+def _scrape_wsa_playwright() -> dict | None:
     """
-    Parse the meteoBase.ch station page HTML to extract current readings.
-    meteoBase pages embed sensor values in <span id="val_..."> tags.
+    Use a headless browser to load WSA-Ipsach and extract sensor readings
+    directly from the rendered DOM.  Logs the raw readings on the first run
+    so you can verify the values look correct.
     """
-    try:
-        r = requests.get(
-            "https://wsa-ipsach.meteobase.ch/",
-            timeout=12,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; WeatherTracker/1.0)",
-                "Accept-Language": "de,en;q=0.9",
-            },
-            allow_redirects=True,
-        )
-        html = r.text
-
-        def extract(pattern):
-            m = re.search(pattern, html, re.IGNORECASE)
-            if m:
-                try:
-                    return float(m.group(1).replace(",", "."))
-                except ValueError:
-                    pass
-            return None
-
-        # Common meteoBase.ch patterns
-        wind_kmh  = (
-            extract(r'id=["\']val_windspeed["\'][^>]*>([\d.,]+)')
-            or extract(r'Wind.*?<[^>]+>([\d.,]+)\s*km/h')
-        )
-        gust_kmh  = (
-            extract(r'id=["\']val_windgust["\'][^>]*>([\d.,]+)')
-            or extract(r'B.+?<[^>]+>([\d.,]+)\s*km/h')
-        )
-        wind_dir  = extract(r'id=["\']val_winddir["\'][^>]*>([\d.,]+)')
-        temp_c    = (
-            extract(r'id=["\']val_temperature["\'][^>]*>([\d.,\-]+)')
-            or extract(r'Temp[^<]*<[^>]+>([\d.,\-]+)\s*°')
-        )
-        precip_mm = (
-            extract(r'id=["\']val_rain["\'][^>]*>([\d.,]+)')
-            or extract(r'Regen[^<]*<[^>]+>([\d.,]+)\s*mm')
-        )
-
-        if wind_kmh is not None or temp_c is not None:
-            now = utc_now()
-            result = {
-                "source":        "wsa-ipsach.meteobase.ch (html)",
-                "obs_time_utc":  now.isoformat(),
-                "hour_key":      hour_key(now),
-                "wind_speed_kn": _to_knots_from_kmh(wind_kmh),
-                "wind_gust_kn":  _to_knots_from_kmh(gust_kmh),
-                "wind_dir_deg":  wind_dir,
-                "temp_c":        temp_c,
-                "precip_mm":     precip_mm,
-            }
-            log.info("  ✓ Got meteoBase measurement via HTML scrape")
-            return result
-    except Exception as exc:
-        log.debug("  HTML scrape failed: %s", exc)
-    return None
-
-
-def _fetch_meteoswiss_opendata() -> dict | None:
-    """
-    Use the MeteoSwiss / geo.admin.ch open data JSON feeds.
-    Finds Biel/Bienne (station BIE) or the nearest station to WSA-Ipsach.
-    """
-    # Station abbreviation for Biel/Bienne known to MeteoSwiss: BIE
-    TARGET_STATION = "BIE"
-    BASE = "https://data.geo.admin.ch"
-
-    variable_urls = {
-        "wind_speed_kmh": (
-            f"{BASE}/ch.meteoschweiz.messwerte-windgeschwindigkeit-kmh-10min"
-            f"/ch.meteoschweiz.messwerte-windgeschwindigkeit-kmh-10min_en.json"
-        ),
-        "wind_gust_kmh": (
-            f"{BASE}/ch.meteoschweiz.messwerte-wind-boeenspitze-kmh-10min"
-            f"/ch.meteoschweiz.messwerte-wind-boeenspitze-kmh-10min_en.json"
-        ),
-        "wind_dir": (
-            f"{BASE}/ch.meteoschweiz.messwerte-windrichtung-10min"
-            f"/ch.meteoschweiz.messwerte-windrichtung-10min_en.json"
-        ),
-        "temp_c": (
-            f"{BASE}/ch.meteoschweiz.messwerte-lufttemperatur-10min"
-            f"/ch.meteoschweiz.messwerte-lufttemperatur-10min_en.json"
-        ),
-        "precip_mm": (
-            f"{BASE}/ch.meteoschweiz.messwerte-niederschlag-10min"
-            f"/ch.meteoschweiz.messwerte-niederschlag-10min_en.json"
-        ),
-    }
-
-    readings = {}
-    obs_time = None
-
-    for var, url in variable_urls.items():
-        try:
-            r = requests.get(url, timeout=10)
-            r.raise_for_status()
-            geo = r.json()
-            for feature in geo.get("features", []):
-                props = feature.get("properties", {})
-                station_id = props.get("station_id", "") or props.get("nat_abbr", "")
-                if station_id.upper() == TARGET_STATION:
-                    val = props.get("value")
-                    readings[var] = _float(val)
-                    if obs_time is None:
-                        obs_time = props.get("reference_ts") or props.get("date")
-                    break
-        except Exception as exc:
-            log.debug("  MeteoSwiss %s fetch failed: %s", var, exc)
-
-    if not readings:
+    if not PLAYWRIGHT_AVAILABLE:
+        log.warning("  Playwright not available — skipping browser scrape.")
         return None
 
-    now = utc_now()
-    return {
-        "source":        f"MeteoSwiss open data (station {TARGET_STATION})",
-        "obs_time_utc":  obs_time or now.isoformat(),
-        "hour_key":      hour_key(now),
-        "wind_speed_kn": _to_knots_from_kmh(readings.get("wind_speed_kmh")),
-        "wind_gust_kn":  _to_knots_from_kmh(readings.get("wind_gust_kmh")),
-        "wind_dir_deg":  readings.get("wind_dir"),
-        "temp_c":        readings.get("temp_c"),
-        "precip_mm":     readings.get("precip_mm"),
-    }
-
-
-def _to_knots_from_kmh(kmh) -> float | None:
-    v = _float(kmh)
-    return round(v / 1.852, 2) if v is not None else None
-
-
-def _float(v) -> float | None:
     try:
-        return float(v)
-    except (TypeError, ValueError):
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page    = browser.new_page()
+            page.goto("https://wsa-ipsach.meteobase.ch/", timeout=20_000)
+            page.wait_for_timeout(3_000)  # let JS finish rendering
+
+            # Extract labelled values from the DOM by scanning table rows.
+            # meteoBase.ch renders a table with label | value | unit columns.
+            readings = page.evaluate("""() => {
+                const result = {};
+
+                // Strategy 1: look for elements with id containing sensor names
+                const idMap = {
+                    wind_speed: ['windspeed', 'wind_speed', 'ws', 'windmittel', 'geschwindigkeit'],
+                    wind_gust:  ['windgust', 'wind_gust', 'wg', 'boe', 'boen', 'gust'],
+                    wind_dir:   ['winddir', 'wind_dir', 'wd', 'richtung', 'direction'],
+                    temp:       ['temperature', 'temp', 'ta', 'lufttemperatur'],
+                    precip:     ['rain', 'precip', 'regen', 'niederschlag', 'rr'],
+                };
+                for (const [key, ids] of Object.entries(idMap)) {
+                    for (const id of ids) {
+                        const el = document.getElementById(id)
+                                || document.querySelector(`[id*="${id}"]`)
+                                || document.querySelector(`[class*="${id}"]`);
+                        if (el && el.innerText.match(/[-\d.,]+/)) {
+                            result[key] = el.innerText.match(/[-\d.,]+/)[0];
+                            break;
+                        }
+                    }
+                }
+
+                // Strategy 2: scan every table row for label+value pairs
+                if (Object.keys(result).length < 2) {
+                    document.querySelectorAll('tr').forEach(row => {
+                        const cells = Array.from(row.querySelectorAll('td, th'));
+                        if (cells.length < 2) return;
+                        const label = (cells[0].innerText || '').toLowerCase().trim();
+                        const valText = (cells[1].innerText || cells[2]?.innerText || '').trim();
+                        const num = valText.match(/^[-\d.,]+/);
+                        if (!num) return;
+                        const v = num[0].replace(',', '.');
+
+                        if (!result.wind_speed && (label.includes('wind') && !label.includes('bö') && !label.includes('gust') && !label.includes('richtung') && !label.includes('dir')))
+                            result.wind_speed = v;
+                        if (!result.wind_gust && (label.includes('bö') || label.includes('gust') || label.includes('boe')))
+                            result.wind_gust = v;
+                        if (!result.wind_dir && (label.includes('richtung') || label.includes('direction') || label.includes('dir')))
+                            result.wind_dir = v;
+                        if (!result.temp && (label.includes('temp') || label.includes('°c')))
+                            result.temp = v;
+                        if (!result.precip && (label.includes('regen') || label.includes('rain') || label.includes('niederschlag') || label.includes('precip')))
+                            result.precip = v;
+                    });
+                }
+
+                return result;
+            }""")
+
+            # Also grab visible text for debugging if readings are sparse
+            if len(readings) < 2:
+                body_text = page.inner_text("body")
+                log.warning("  WSA-Ipsach: only %d fields extracted. Page text snippet:\n%s",
+                            len(readings), body_text[:1500])
+            else:
+                log.info("  WSA-Ipsach DOM readings: %s", readings)
+
+            browser.close()
+
+        now = utc_now()
+        wind_kmh = _float(readings.get("wind_speed"))
+        gust_kmh = _float(readings.get("wind_gust"))
+
+        if wind_kmh is None and _float(readings.get("temp")) is None:
+            log.warning("  WSA-Ipsach Playwright: page loaded but no usable values found.")
+            return None
+
+        result = {
+            "source":        "wsa-ipsach.meteobase.ch (playwright)",
+            "obs_time_utc":  now.isoformat(),
+            "hour_key":      hour_key(now),
+            "wind_speed_kn": _to_knots_from_kmh(wind_kmh),
+            "wind_gust_kn":  _to_knots_from_kmh(gust_kmh),
+            "wind_dir_deg":  _float(readings.get("wind_dir")),
+            "temp_c":        _float(readings.get("temp")),
+            "precip_mm":     _float(readings.get("precip")),
+        }
+        log.info("  ✓ Got WSA-Ipsach measurement via Playwright: %s", result)
+        return result
+
+    except Exception as exc:
+        log.warning("  WSA-Ipsach Playwright scrape failed: %s", exc)
+        return None
+
+
+def _fetch_open_meteo() -> dict | None:
+    """
+    Free Open-Meteo API at WSA-Ipsach coordinates — no API key needed.
+    Used only if both WSA scrape attempts fail.
+    """
+    try:
+        now = utc_now()
+        r = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude":       STATION_LAT,
+                "longitude":      STATION_LON,
+                "hourly":         "temperature_2m,windspeed_10m,winddirection_10m,windgusts_10m,precipitation",
+                "windspeed_unit": "kn",
+                "timezone":       "UTC",
+                "forecast_days":  1,
+                "past_hours":     2,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        data   = r.json()
+        hourly = data.get("hourly", {})
+        times  = hourly.get("time", [])
+        if not times:
+            return None
+
+        # Most recent completed hour
+        target = hour_key(now - timedelta(hours=1))
+        idx = next((i for i, t in enumerate(times) if t[:13] == target[:13]), -1)
+
+        result = {
+            "source":        f"Open-Meteo fallback (lat={STATION_LAT}, lon={STATION_LON})",
+            "obs_time_utc":  times[idx] + ":00+00:00",
+            "hour_key":      times[idx][:13],
+            "wind_speed_kn": _float(hourly.get("windspeed_10m",     [None])[idx]),
+            "wind_gust_kn":  _float(hourly.get("windgusts_10m",     [None])[idx]),
+            "wind_dir_deg":  _float(hourly.get("winddirection_10m", [None])[idx]),
+            "temp_c":        _float(hourly.get("temperature_2m",    [None])[idx]),
+            "precip_mm":     _float(hourly.get("precipitation",     [None])[idx]),
+        }
+        log.info("  ✓ Got Open-Meteo fallback measurement.")
+        return result
+    except Exception as exc:
+        log.debug("  Open-Meteo fetch failed: %s", exc)
         return None
 
 
@@ -496,17 +468,14 @@ def save_measurement(obs: dict) -> None:
 # ── 3. Collection entry-point ─────────────────────────────────────────────────
 
 def collect() -> None:
-    """One collection cycle: fetch forecasts + measurement and save them."""
     now = utc_now().replace(minute=0, second=0, microsecond=0)
 
-    # Forecasts
     raw = fetch_windguru_forecasts()
     if raw:
         records = parse_windguru_forecasts(raw)
         if records:
             save_forecasts(records, now)
 
-    # Measurement
     obs = fetch_meteobase_measurement()
     if obs:
         save_measurement(obs)
@@ -553,7 +522,6 @@ def _rmse(a: pd.Series, b: pd.Series) -> float:
 
 
 def _wind_dir_error(a: pd.Series, b: pd.Series) -> float:
-    """Mean absolute circular error for wind direction."""
     mask = a.notna() & b.notna()
     if mask.sum() == 0:
         return float("nan")
@@ -571,29 +539,21 @@ def analyse() -> None:
     obs_df  = load_all_measurements()
 
     if fcst_df.empty:
-        print("\n⚠  No forecast data found in weather_data/forecasts/.\n"
-              "   Run the collector first (hourly cron or: python weather_tracker.py --collect).\n")
+        print("\n⚠  No forecast data found. Run the collector first.\n")
         return
-
     if obs_df.empty:
-        print("\n⚠  No measurement data found in weather_data/measurements/.\n"
-              "   Run the collector first.\n")
+        print("\n⚠  No measurement data found. Run the collector first.\n")
         return
 
-    # Round obs to nearest hour for joining
     obs_df["hour_key"] = obs_df["obs_dt"].dt.strftime("%Y-%m-%dT%H")
-
-    # Keep only the forecast rows whose valid_time falls on an hour for which
-    # we have an actual observation
     obs_hours = set(obs_df["hour_key"])
     fcst_df   = fcst_df[fcst_df["hour_key"].isin(obs_hours)].copy()
 
     if fcst_df.empty:
-        print("\n⚠  Forecast valid times do not overlap with measurement times yet.\n"
-              "   Keep collecting – you need at least one future hour to elapse.\n")
+        print("\n⚠  Forecast valid times do not overlap with measurements yet.\n"
+              "   Keep collecting — you need at least one future hour to elapse.\n")
         return
 
-    # Merge
     obs_slim = obs_df[[
         "hour_key", "wind_speed_kn", "wind_gust_kn", "wind_dir_deg", "temp_c"
     ]].rename(columns={
@@ -605,10 +565,9 @@ def analyse() -> None:
     merged = fcst_df.merge(obs_slim, on="hour_key", how="inner")
 
     if merged.empty:
-        print("\n⚠  No matching hour_key found between forecasts and observations.\n")
+        print("\n⚠  No matching hour_key between forecasts and observations.\n")
         return
 
-    # ── per-model, per-lead-bucket metrics ───────────────────────────────────
     lead_bins   = [0, 6, 12, 24, 48, 72, 120]
     lead_labels = ["0-6h", "6-12h", "12-24h", "24-48h", "48-72h", "72-120h"]
     merged["lead_bin"] = pd.cut(merged["lead_hours"], bins=lead_bins,
@@ -629,64 +588,41 @@ def analyse() -> None:
         for var_name, (fcol, ocol, unit) in variables.items():
             if fcol not in grp.columns or ocol not in grp.columns:
                 continue
-            if var_name == "wind_dir":
-                mae_all = _wind_dir_error(grp[fcol], grp[ocol])
-            else:
-                mae_all = _mae(grp[fcol], grp[ocol])
+            mae_all  = _wind_dir_error(grp[fcol], grp[ocol]) if var_name == "wind_dir" else _mae(grp[fcol], grp[ocol])
             rmse_all = _rmse(grp[fcol], grp[ocol])
-
             summary_rows.append({
-                "model":      model,
-                "variable":   var_name,
-                "unit":       unit,
-                "n_hours":    n_total,
-                "MAE_all":    round(mae_all, 3),
-                "RMSE_all":   round(rmse_all, 3),
+                "model": model, "variable": var_name, "unit": unit,
+                "n_hours": n_total, "MAE_all": round(mae_all, 3), "RMSE_all": round(rmse_all, 3),
             })
-
             for lb in lead_labels:
                 sub = grp[grp["lead_bin"] == lb]
                 if len(sub) == 0:
                     continue
-                if var_name == "wind_dir":
-                    mae_lb = _wind_dir_error(sub[fcol], sub[ocol])
-                else:
-                    mae_lb = _mae(sub[fcol], sub[ocol])
+                mae_lb = _wind_dir_error(sub[fcol], sub[ocol]) if var_name == "wind_dir" else _mae(sub[fcol], sub[ocol])
                 detail_rows.append({
-                    "model":     model,
-                    "variable":  var_name,
-                    "lead_bin":  lb,
-                    "n_hours":   len(sub),
-                    "MAE":       round(mae_lb, 3),
+                    "model": model, "variable": var_name,
+                    "lead_bin": lb, "n_hours": len(sub), "MAE": round(mae_lb, 3),
                 })
 
     summary_df = pd.DataFrame(summary_rows)
     detail_df  = pd.DataFrame(detail_rows)
 
-    # ── composite score (rank) ────────────────────────────────────────────────
-    # Weight: wind_speed 40%, wind_gust 30%, wind_dir 15%, temp 15%
-    weights = {"wind_speed": 0.40, "wind_gust": 0.30, "wind_dir": 0.15, "temp": 0.15}
-
-    # Normalise each variable's MAE across models (0=best, 1=worst)
+    weights  = {"wind_speed": 0.40, "wind_gust": 0.30, "wind_dir": 0.15, "temp": 0.15}
     score_df = summary_df.pivot(index="model", columns="variable", values="MAE_all")
     for col in score_df.columns:
-        col_min = score_df[col].min()
-        col_max = score_df[col].max()
+        col_min, col_max = score_df[col].min(), score_df[col].max()
         rng = col_max - col_min
         score_df[col] = (score_df[col] - col_min) / rng if rng else 0.0
-
     score_df["composite_score"] = sum(
-        score_df.get(v, 0) * w for v, w in weights.items()
-        if v in score_df.columns
+        score_df.get(v, 0) * w for v, w in weights.items() if v in score_df.columns
     )
     score_df = score_df.sort_values("composite_score")
 
-    # ── print results ─────────────────────────────────────────────────────────
     print("\n" + "═" * 70)
     print("  WINDGURU MODEL ACCURACY REPORT")
     print(f"  Spot: Bielersee, Nidau  |  Observation source: WSA-Ipsach")
     print(f"  Period: {obs_df['hour_key'].min()} → {obs_df['hour_key'].max()}")
-    print(f"  Observations used: {len(obs_df)}  |  Forecast records matched: {len(merged)}")
+    print(f"  Observations: {len(obs_df)}  |  Matched forecast records: {len(merged)}")
     print("═" * 70)
 
     print("\n── OVERALL MAE (all lead times) ──────────────────────────────────────")
@@ -700,9 +636,7 @@ def analyse() -> None:
     rank_table.insert(0, "rank", range(1, len(rank_table) + 1))
     print(tabulate(rank_table, headers=rank_table.columns,
                    tablefmt="rounded_outline", floatfmt=".4f", index=False))
-
-    best_model = score_df.index[0]
-    print(f"\n  ★  BEST MODEL OVERALL: {best_model}")
+    print(f"\n  ★  BEST MODEL OVERALL: {score_df.index[0]}")
 
     print("\n── WIND SPEED MAE BY LEAD-TIME BUCKET (knots) ────────────────────────")
     ws_detail = detail_df[detail_df["variable"] == "wind_speed"].copy()
@@ -713,41 +647,24 @@ def analyse() -> None:
         ws_pivot = ws_pivot.reindex(columns=[l for l in lead_labels if l in ws_pivot.columns])
         print(tabulate(ws_pivot, headers="keys", tablefmt="rounded_outline", floatfmt=".3f"))
 
-    # ── save to CSV ───────────────────────────────────────────────────────────
     ts = utc_now().strftime("%Y%m%dT%H%M")
     summary_fp = ANALYSIS_DIR / f"summary_{ts}.csv"
     detail_fp  = ANALYSIS_DIR / f"detail_{ts}.csv"
     rank_fp    = ANALYSIS_DIR / f"ranking_{ts}.csv"
-
     summary_df.to_csv(summary_fp, index=False)
     detail_df.to_csv(detail_fp,   index=False)
     score_df.to_csv(rank_fp)
-
-    print(f"\n  Reports saved to:")
-    print(f"    {summary_fp}")
-    print(f"    {detail_fp}")
-    print(f"    {rank_fp}")
+    print(f"\n  Reports saved to: {ANALYSIS_DIR}/")
     print("═" * 70 + "\n")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Windguru forecast tracker & accuracy analyser"
-    )
-    parser.add_argument(
-        "--collect", action="store_true",
-        help="Fetch forecasts + measurement now and save (default action)"
-    )
-    parser.add_argument(
-        "--analyse", action="store_true",
-        help="Analyse saved data and print accuracy report"
-    )
-    parser.add_argument(
-        "--both", action="store_true",
-        help="Collect then analyse"
-    )
+    parser = argparse.ArgumentParser(description="Windguru forecast tracker & accuracy analyser")
+    parser.add_argument("--collect", action="store_true", help="Fetch and save data (default)")
+    parser.add_argument("--analyse", action="store_true", help="Print accuracy report")
+    parser.add_argument("--both",    action="store_true", help="Collect then analyse")
     args = parser.parse_args()
 
     if args.analyse:
@@ -756,7 +673,6 @@ def main():
         collect()
         analyse()
     else:
-        # Default: collect
         collect()
 
 
