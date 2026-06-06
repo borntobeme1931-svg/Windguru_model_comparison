@@ -440,46 +440,62 @@ def _scrape_wsa_playwright() -> dict | None:
             page_text = page.inner_text("body")
             browser.close()
 
-        log.info("  WSA-Ipsach page text (first 1500 chars):\n%s", page_text[:1500])
+        # log full page text so we can see all labels if extraction fails
+        log.info("  WSA-Ipsach page text:\n%s", page_text[:3000])
 
-        def after_label(label: str) -> str | None:
-            """Return the first token on the same or next line after label."""
+        def after_label(label: str):
+            """
+            Find label in page text and return (numeric_value, unit_str) tuple.
+            Handles values like "14.8km/h", "14.8 km/h", "14.8", "WSW".
+            """
+            idx = page_text.find(label)
+            if idx == -1:
+                return None, None
+            snippet = page_text[idx + len(label):idx + len(label) + 80].strip()
+            # match: optional sign, digits, optional decimal, then optional unit
+            m = re.search(r"([+-]?\d+[.,]?\d*)\s*(km/h|m/s|°C|°c|mm|%)?", snippet)
+            if m:
+                num = m.group(1).replace(",", ".")
+                unit = (m.group(2) or "").lower()
+                return num, unit
+            # no number — return raw word (for direction)
+            w = re.search(r"([A-Za-zÄÖÜäöüß/-]+)", snippet)
+            return (w.group(1), "") if w else (None, None)
+
+        def after_label_str(label: str) -> str | None:
+            """Return raw word token after label (for direction)."""
             idx = page_text.find(label)
             if idx == -1:
                 return None
-            snippet = page_text[idx + len(label):idx + len(label) + 60]
-            # grab first number or word token
-            m = re.search(r"[\w.,/-]+", snippet.strip())
-            return m.group(0).strip() if m else None
+            snippet = page_text[idx + len(label):idx + len(label) + 40].strip()
+            m = re.search(r"([A-Za-z]+)", snippet)
+            return m.group(1) if m else None
 
         # ── wind speed (10-min average) ──────────────────────────────────────
-        ws_raw = after_label("Wind-10min-Ø:") or after_label("Wind-10min-O:")
+        ws_num, ws_unit = after_label("Wind-10min-Ø:") or after_label("Wind-10min-O:") or (None, None)
         # ── wind gust (10-min max) ───────────────────────────────────────────
-        wg_raw = after_label("Wind-10min-Max:")
+        wg_num, wg_unit = after_label("Wind-10min-Max:") or (None, None)
         # ── wind direction ───────────────────────────────────────────────────
-        wd_raw = (after_label("Windrichtung:") or after_label("Richtung:")
-                  or after_label("Wind-Richtung:"))
+        wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:")
+                  or after_label_str("Wind-Richtung:") or after_label_str("Windrichtung"))
         # ── temperature ──────────────────────────────────────────────────────
-        tc_raw = (after_label("Lufttemperatur:") or after_label("Temperatur:")
-                  or after_label("Temp.:"))
+        tc_num, _ = after_label("Lufttemperatur:") or after_label("Temperatur:") or after_label("Temp.:") or (None, None)
         # ── precipitation ────────────────────────────────────────────────────
-        rr_raw = (after_label("Niederschlag:") or after_label("Regen:")
-                  or after_label("Niederschlag 10min:"))
+        rr_num, _ = after_label("Niederschlag:") or after_label("Regen:") or after_label("Niederschlag 10min:") or (None, None)
 
-        log.info("  WSA raw tokens: ws=%s wg=%s wd=%s tc=%s rr=%s",
-                 ws_raw, wg_raw, wd_raw, tc_raw, rr_raw)
+        log.info("  WSA tokens: ws=%s(%s) wg=%s(%s) wd=%s tc=%s rr=%s",
+                 ws_num, ws_unit, wg_num, wg_unit, wd_raw, tc_num, rr_num)
 
-        # ── unit detection: look for km/h or m/s near wind values ───────────
-        unit_is_ms = bool(re.search(r"\d\s*m/s", page_text, re.IGNORECASE)) and                      not re.search(r"\d\s*km/h", page_text, re.IGNORECASE)
-
-        def to_knots(raw_str):
-            v = _float(raw_str)
+        def to_knots(num_str, unit_str):
+            v = _float(num_str)
             if v is None:
                 return None
-            return _knots_from_ms(v) if unit_is_ms else _knots_from_kmh(v)
+            if unit_str == "m/s":
+                return _knots_from_ms(v)
+            return _knots_from_kmh(v)  # default: km/h
 
-        ws_kn  = to_knots(ws_raw)
-        wg_kn  = to_knots(wg_raw)
+        ws_kn  = to_knots(ws_num, ws_unit)
+        wg_kn  = to_knots(wg_num, wg_unit)
         wd_deg = _dir_to_deg(wd_raw)
         wd_txt = _deg_to_compass(wd_deg) or (wd_raw.strip().upper() if wd_raw else None)
         tc     = _float(tc_raw)
