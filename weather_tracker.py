@@ -471,17 +471,25 @@ def _scrape_wsa_playwright() -> dict | None:
             m = re.search(r"([A-Za-z]+)", snippet)
             return m.group(1) if m else None
 
+        def get_num(label: str, *fallbacks: str):
+            """Try each label in order; return (num_str, unit_str) for the first match."""
+            for lbl in (label, *fallbacks):
+                num, unit = after_label(lbl)
+                if num is not None:
+                    return num, unit
+            return None, None
+
         # ── wind speed (10-min average) ──────────────────────────────────────
-        ws_num, ws_unit = after_label("Wind-10min-Ø:") or after_label("Wind-10min-O:") or (None, None)
+        ws_num, ws_unit = get_num("Wind-10min-Ø:", "Wind-10min-O:", "Wind-Ø:", "Windgeschwindigkeit:")
         # ── wind gust (10-min max) ───────────────────────────────────────────
-        wg_num, wg_unit = after_label("Wind-10min-Max:") or (None, None)
+        wg_num, wg_unit = get_num("Wind-10min-Max:", "Windböe:", "Böe:", "Bö:")
         # ── wind direction ───────────────────────────────────────────────────
         wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:")
                   or after_label_str("Wind-Richtung:") or after_label_str("Windrichtung"))
         # ── temperature ──────────────────────────────────────────────────────
-        tc_num, _ = after_label("Lufttemperatur:") or after_label("Temperatur:") or after_label("Temp.:") or (None, None)
+        tc_num, _ = get_num("Lufttemperatur:", "Temperatur:", "Temp.:", "Lufttemp.:")
         # ── precipitation ────────────────────────────────────────────────────
-        rr_num, _ = after_label("Niederschlag:") or after_label("Regen:") or after_label("Niederschlag 10min:") or (None, None)
+        rr_num, _ = get_num("Niederschlag:", "Niederschlag 10min:", "Regen:", "Regenmenge:")
 
         log.info("  WSA tokens: ws=%s(%s) wg=%s(%s) wd=%s tc=%s rr=%s",
                  ws_num, ws_unit, wg_num, wg_unit, wd_raw, tc_num, rr_num)
@@ -498,8 +506,8 @@ def _scrape_wsa_playwright() -> dict | None:
         wg_kn  = to_knots(wg_num, wg_unit)
         wd_deg = _dir_to_deg(wd_raw)
         wd_txt = _deg_to_compass(wd_deg) or (wd_raw.strip().upper() if wd_raw else None)
-        tc     = _float(tc_raw)
-        rr     = _float(rr_raw)
+        tc     = _float(tc_num)
+        rr     = _float(rr_num)
 
         if ws_kn is None and tc is None:
             log.warning("  WSA-Ipsach: could not extract any usable values.")
