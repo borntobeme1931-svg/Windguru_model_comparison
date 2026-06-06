@@ -43,3 +43,30 @@ Wassertemperatur: 19.9°C
 2026-06-06 15:49:17,700  INFO        ↳ Falling back to Open-Meteo at WSA-Ipsach coordinates …
 2026-06-06 15:49:18,089  INFO        ✓ Got Open-Meteo fallback measurement.
 2026-06-06 15:49:18,091  INFO        Saved measurement → weather_data/measurements/2026-06-06T15.json
+2026-06-06 15:55:30,445  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-06 15:55:31,330  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-06 15:55:41,080  INFO        ✓ Got forecast via Playwright (29 models)
+2026-06-06 15:55:41,080  INFO        Parsed 0 hourly forecast records across 0 models.
+2026-06-06 15:55:41,080  WARNING     No records parsed. Top-level keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars']
+2026-06-06 15:55:41,080  WARNING     fcst type: dict, sample: {'initstamp': 1780747200, 'TMP': [19.3, 20.4, 20.8, 19.8, 18.9, 18.9, 18, 16.8, 15.6, 15.1, 14.4, 14.3, 14.3, 13.8, 13.4, 13, 12.7, 12.9, 13.6, 14.3, 15.2, 16.1, 17.2, 18.3, 19.6, 20.5, 21, 21.2, 21.1, 20.7, 20, 18, 15.9, 14.5, 13.5, 13.2, 13.2, 12.9, 12.6, 12.5, 12, 12.5, 14.9, 16.5, 18.3, 20, 21.3
+2026-06-06 15:55:41,080  INFO      Fetching WSA-Ipsach measurement …
+2026-06-06 15:55:48,515  WARNING     WSA-Ipsach: only 1 fields extracted. Page text snippet:
+WSA-Ipsach
+
+06.06.2026 (CEST) 17:46 :: 440müM
+
+Wind-10min-Ø: 16.2km/h (8.7kn, 3Bf) WSW
+Wind-10min-Max: 20.5km/h (11.1kn, 3Bf) WSW
+Gust-Factor (GF): 1.6 / Richtungstreue: 98%
+Wassertemperatur: 19.9°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-06 15:55:48,573  WARNING     WSA-Ipsach Playwright: page loaded but no usable values found.
+2026-06-06 15:55:48,573  INFO        ↳ Falling back to Open-Meteo at WSA-Ipsach coordinates …
+2026-06-06 15:55:48,982  INFO        ✓ Got Open-Meteo fallback measurement.
+2026-06-06 15:55:48,983  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
