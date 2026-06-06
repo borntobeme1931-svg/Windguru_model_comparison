@@ -274,3 +274,15 @@ Wassertemperatur: 19.8°C
 2026-06-06 19:57:44,838  INFO        WSA tokens: ws=16.6(km/h) wg=29.5(km/h) wd=None tc=None rr=None
 2026-06-06 19:57:44,839  INFO        ✓ WSA-Ipsach: wind=8.96 kn gust=15.93 kn dir=None (None°) temp=None°C
 2026-06-06 19:57:44,839  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
+2026-06-06 23:46:38,926  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-06 23:46:39,833  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-06 23:46:50,342  INFO        ✓ Got forecast via Playwright (30 models)
+2026-06-06 23:46:50,342  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'GUST', 'FLHGT', 'SLP', 'RH', 'TMP', 'TCDC', 'APCP', 'APCP1', 'HCDC', 'MCDC']
+2026-06-06 23:46:50,344  INFO        Parsed 93 hourly forecast records across 1 model block(s).
+2026-06-06 23:46:50,345  INFO        Appended 93 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-06 23:46:50,345  INFO      Fetching WSA-Ipsach measurement …
+2026-06-06 23:47:41,892  WARNING     WSA-Ipsach Playwright scrape failed: Page.goto: Timeout 20000ms exceeded.
+Call log:
+  - navigating to "https://wsa-ipsach.meteobase.ch/", waiting until "load"
+
+2026-06-06 23:47:41,892  ERROR       ✗ Could not retrieve any measurement.
