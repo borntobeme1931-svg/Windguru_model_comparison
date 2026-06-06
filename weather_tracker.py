@@ -198,12 +198,22 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
     lead_hours = how many hours ahead the forecast is from the model run time.
     """
     records = []
-    fcst_block = raw.get("fcst", {})
+    fcst_raw = raw.get("fcst", {})
+
+    # Windguru returns "fcst" either as a dict {model_id: {...}} or a list
+    # [{model_name:..., ...}, ...] depending on how the data was captured.
+    if isinstance(fcst_raw, list):
+        fcst_block = {str(i): m for i, m in enumerate(fcst_raw) if isinstance(m, dict)}
+    elif isinstance(fcst_raw, dict):
+        # Values may themselves be dicts or scalars; keep only dict values
+        fcst_block = {k: v for k, v in fcst_raw.items() if isinstance(v, dict)}
+    else:
+        fcst_block = {}
 
     # Model run offset: Windguru stores forecast hours as offsets from
     # a reference timestamp per model.
     for model_id, model_data in fcst_block.items():
-        model_name = model_data.get("model_name", model_id)
+        model_name = model_data.get("model_name") or model_data.get("name") or model_id
         timestamps = model_data.get("fcst_hour_idx", [])  # epoch seconds per step
         hours      = model_data.get("hours", [])          # hour-of-day (optional)
 
@@ -245,6 +255,9 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
 
     log.info("  Parsed %d hourly forecast records across %d models.",
              len(records), len(fcst_block))
+    if not records:
+        log.warning("  No records parsed. Top-level keys: %s", list(raw.keys()))
+        log.warning("  fcst type: %s, sample: %s", type(raw.get("fcst")).__name__, str(raw.get("fcst"))[:300])
     return records
 
 
