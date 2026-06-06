@@ -286,6 +286,7 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
                 "wind_speed_kn":  _safe(wind_speed, i),  # already knots from Windguru
                 "wind_gust_kn":   _safe(wind_gust,  i),
                 "wind_dir_deg":   _safe(wind_dir,   i),
+                "wind_dir_txt":   _deg_to_compass(_safe(wind_dir, i)),
                 "temp_c":         _safe(temp,        i),
                 "precip_mm":      _safe(precip,      i),
             })
@@ -350,13 +351,15 @@ def _parse_meteobase_json(data: dict) -> dict | None:
                  or _knots_from_kmh(data.get("wind_speed_kmh")))
         wg_kn = (_knots_from_ms(data.get("wind_gust") or data.get("wg"))
                  or _knots_from_kmh(data.get("wind_gust_kmh")))
+        wd_deg = _float(data.get("wind_dir") or data.get("wd"))
         result = {
             "source":        "wsa-ipsach.meteobase.ch (json)",
             "obs_time_utc":  now.isoformat(),
             "hour_key":      hour_key(now),
             "wind_speed_kn": ws_kn,
             "wind_gust_kn":  wg_kn,
-            "wind_dir_deg":  _float(data.get("wind_dir") or data.get("wd")),
+            "wind_dir_deg":  wd_deg,
+            "wind_dir_txt":  _deg_to_compass(wd_deg),
             "temp_c":        _float(data.get("temp") or data.get("temperature") or data.get("ta")),
             "precip_mm":     _float(data.get("precip") or data.get("rain") or data.get("rr")),
         }
@@ -366,6 +369,57 @@ def _parse_meteobase_json(data: dict) -> dict | None:
         return None
     except Exception:
         return None
+
+
+# Full 16-point compass: label → degrees  (German abbreviations used on WSA)
+# N=Nord, O=Ost, S=Süd, W=West
+_COMPASS_16 = [
+    (  0.0, "N"),
+    ( 22.5, "NNO"),
+    ( 45.0, "NO"),
+    ( 67.5, "ONO"),
+    ( 90.0, "O"),
+    (112.5, "OSO"),
+    (135.0, "SO"),
+    (157.5, "SSO"),
+    (180.0, "S"),
+    (202.5, "SSW"),
+    (225.0, "SW"),
+    (247.5, "WSW"),
+    (270.0, "W"),
+    (292.5, "WNW"),
+    (315.0, "NW"),
+    (337.5, "NNW"),
+]
+
+# German + English abbreviation → degrees
+_DIR_TO_DEG: dict[str, float] = {}
+for _deg, _lbl in _COMPASS_16:
+    _DIR_TO_DEG[_lbl.lower()] = _deg
+    # map O→E variants for English input
+    _en = _lbl.replace("O", "E").replace("o", "e")
+    _DIR_TO_DEG[_en.lower()] = _deg
+
+def _dir_to_deg(text: str) -> float | None:
+    """Convert German/English cardinal direction text to degrees."""
+    if not text:
+        return None
+    cleaned = text.strip().lower().replace("-", "").replace(".", "").replace(" ", "")
+    try:
+        v = float(cleaned)
+        return v if 0 <= v <= 360 else None
+    except ValueError:
+        pass
+    return _DIR_TO_DEG.get(cleaned)
+
+def _deg_to_compass(deg: float | None) -> str | None:
+    """Convert degrees to 16-point compass label (German, e.g. WSW)."""
+    if deg is None:
+        return None
+    deg = deg % 360
+    # each sector is 22.5° wide; find nearest
+    idx = int((deg + 11.25) / 22.5) % 16
+    return _COMPASS_16[idx][1]
 
 
 def _scrape_wsa_playwright() -> dict | None:
@@ -380,109 +434,75 @@ def _scrape_wsa_playwright() -> dict | None:
             page.goto("https://wsa-ipsach.meteobase.ch/", timeout=20_000)
             page.wait_for_timeout(3_000)
 
-            readings = page.evaluate("""() => {
-                const result = {};
-
-                // Strategy 1: elements whose id contains a sensor keyword
-                const idMap = {
-                    wind_speed: ['windspeed','wind_speed','ws','windmittel','geschwindigkeit'],
-                    wind_gust:  ['windgust','wind_gust','wg','boe','boen','gust','windboee'],
-                    wind_dir:   ['winddir','wind_dir','wd','richtung','direction'],
-                    temp:       ['temperature','temp','ta','lufttemperatur'],
-                    precip:     ['rain','precip','regen','niederschlag','rr'],
-                };
-                for (const [key, ids] of Object.entries(idMap)) {
-                    for (const id of ids) {
-                        const selectors = [
-                            `#${id}`,
-                            `[id*="${id}"]`,
-                            `[class*="${id}"]`,
-                            `[data-sensor="${id}"]`,
-                        ];
-                        for (const sel of selectors) {
-                            try {
-                                const el = document.querySelector(sel);
-                                if (el) {
-                                    const m = el.innerText.match(/[-\d]+[.,]\d+|[-\d]+/);
-                                    if (m) { result[key] = m[0]; break; }
-                                }
-                            } catch(e) {}
-                        }
-                        if (result[key]) break;
-                    }
-                }
-
-                // Strategy 2: scan every <tr> for label + value pairs
-                if (Object.keys(result).length < 2) {
-                    document.querySelectorAll('tr').forEach(row => {
-                        const cells = Array.from(row.querySelectorAll('td, th'));
-                        if (cells.length < 2) return;
-                        const label = (cells[0].innerText || '').toLowerCase().trim();
-                        const valText = (cells[1].innerText || (cells[2] ? cells[2].innerText : '') || '').trim();
-                        const m = valText.match(/^[-\d.,]+/);
-                        if (!m) return;
-                        const v = m[0].replace(',', '.');
-                        if (!result.wind_speed && label.includes('wind') && !label.match(/b.+e|gust|richt|dir/))
-                            result.wind_speed = v;
-                        if (!result.wind_gust && label.match(/b.+e|gust/))
-                            result.wind_gust = v;
-                        if (!result.wind_dir && label.match(/richt|dir/))
-                            result.wind_dir = v;
-                        if (!result.temp && label.match(/temp|°c/))
-                            result.temp = v;
-                        if (!result.precip && label.match(/regen|rain|niederschlag|precip/))
-                            result.precip = v;
-                    });
-                }
-
-                // Strategy 3: log full visible text so we can inspect structure
-                result._page_text = document.body.innerText.slice(0, 2000);
-                return result;
-            }""")
-
-            page_text = readings.pop("_page_text", "")
-
-            if len(readings) < 2:
-                log.warning("  WSA-Ipsach: only %d field(s) found. Page text:\n%s",
-                            len(readings), page_text)
-            else:
-                log.info("  WSA-Ipsach raw readings: %s", readings)
-
+            # Pull the full visible page text — the labels we need are plain text:
+            #   "Wind-10min-Ø:"  followed by the value
+            #   "Wind-10min-Max:" followed by the gust value
+            page_text = page.inner_text("body")
             browser.close()
 
-        now = utc_now()
+        log.info("  WSA-Ipsach page text (first 1500 chars):\n%s", page_text[:1500])
 
-        # Values on meteoBase are typically in km/h; try to detect unit from page text
-        unit_is_ms = "m/s" in page_text and "km/h" not in page_text
+        def after_label(label: str) -> str | None:
+            """Return the first token on the same or next line after label."""
+            idx = page_text.find(label)
+            if idx == -1:
+                return None
+            snippet = page_text[idx + len(label):idx + len(label) + 60]
+            # grab first number or word token
+            m = re.search(r"[\w.,/-]+", snippet.strip())
+            return m.group(0).strip() if m else None
 
-        def to_knots(val_str):
-            v = _float(val_str)
+        # ── wind speed (10-min average) ──────────────────────────────────────
+        ws_raw = after_label("Wind-10min-Ø:") or after_label("Wind-10min-O:")
+        # ── wind gust (10-min max) ───────────────────────────────────────────
+        wg_raw = after_label("Wind-10min-Max:")
+        # ── wind direction ───────────────────────────────────────────────────
+        wd_raw = (after_label("Windrichtung:") or after_label("Richtung:")
+                  or after_label("Wind-Richtung:"))
+        # ── temperature ──────────────────────────────────────────────────────
+        tc_raw = (after_label("Lufttemperatur:") or after_label("Temperatur:")
+                  or after_label("Temp.:"))
+        # ── precipitation ────────────────────────────────────────────────────
+        rr_raw = (after_label("Niederschlag:") or after_label("Regen:")
+                  or after_label("Niederschlag 10min:"))
+
+        log.info("  WSA raw tokens: ws=%s wg=%s wd=%s tc=%s rr=%s",
+                 ws_raw, wg_raw, wd_raw, tc_raw, rr_raw)
+
+        # ── unit detection: look for km/h or m/s near wind values ───────────
+        unit_is_ms = bool(re.search(r"\d\s*m/s", page_text, re.IGNORECASE)) and                      not re.search(r"\d\s*km/h", page_text, re.IGNORECASE)
+
+        def to_knots(raw_str):
+            v = _float(raw_str)
             if v is None:
                 return None
             return _knots_from_ms(v) if unit_is_ms else _knots_from_kmh(v)
 
-        ws_kn = to_knots(readings.get("wind_speed"))
-        wg_kn = to_knots(readings.get("wind_gust"))
-        wd    = _float(readings.get("wind_dir"))
-        tc    = _float(readings.get("temp"))
-        rr    = _float(readings.get("precip"))
+        ws_kn  = to_knots(ws_raw)
+        wg_kn  = to_knots(wg_raw)
+        wd_deg = _dir_to_deg(wd_raw)
+        wd_txt = _deg_to_compass(wd_deg) or (wd_raw.strip().upper() if wd_raw else None)
+        tc     = _float(tc_raw)
+        rr     = _float(rr_raw)
 
         if ws_kn is None and tc is None:
-            log.warning("  WSA-Ipsach Playwright: no usable values found.")
+            log.warning("  WSA-Ipsach: could not extract any usable values.")
             return None
 
+        now = utc_now()
         result = {
             "source":        "wsa-ipsach.meteobase.ch (playwright)",
             "obs_time_utc":  now.isoformat(),
             "hour_key":      hour_key(now),
             "wind_speed_kn": ws_kn,
             "wind_gust_kn":  wg_kn,
-            "wind_dir_deg":  wd,
+            "wind_dir_deg":  wd_deg,
+            "wind_dir_txt":  wd_txt,
             "temp_c":        tc,
             "precip_mm":     rr,
         }
-        log.info("  ✓ WSA-Ipsach measurement: wind=%s kn gust=%s kn dir=%s° temp=%s°C",
-                 ws_kn, wg_kn, wd, tc)
+        log.info("  ✓ WSA-Ipsach: wind=%s kn gust=%s kn dir=%s (%s°) temp=%s°C",
+                 ws_kn, wg_kn, wd_txt, wd_deg, tc)
         return result
 
     except Exception as exc:
