@@ -175,43 +175,61 @@ def fetch_windguru_forecasts(spot_id: int = WINDGURU_SPOT_ID) -> dict | None:
     return None
 
 
-def parse_windguru_forecasts(raw: dict) -> list[dict]:
+def _normalise_to_model_blocks(raw: dict) -> list[dict]:
     """
-    Parse Windguru forecast JSON into flat hourly records.
+    Windguru can return forecast data in several shapes:
+      A) Single model flat:  raw itself has 'hours', 'WINDSPD', 'initdate', etc.
+         plus top-level 'model' / 'id_model' / 'wgmodel'.
+      B) Multi-model dict:   raw['fcst'] = { "1": {model_dict}, "2": {…}, … }
+      C) Multi-model list:   raw['fcst'] = [ {model_dict}, … ]
 
-    Windguru's fcst block looks like:
-      { "1": { "id_model": 3, "model_name": "GFS 13 km",
-               "initdate": "2026-06-06 00:00",
-               "hours": [0, 1, 2, ...],          # hour offsets from initdate
-               "WINDSPD": [12.3, ...],            # knots
-               "GUST":    [15.1, ...],            # knots
-               "WINDDIR": [270, ...],             # degrees
-               "TMP":     [18.2, ...],            # °C
-               "APCP":    [0.0, ...] }, ... }
+    Returns a list of model dicts, each guaranteed to have the forecast arrays.
     """
-    records = []
     fcst_raw = raw.get("fcst", {})
 
-    # normalise to dict of dicts
+    # shape B – dict of model dicts
+    if isinstance(fcst_raw, dict):
+        children = [v for v in fcst_raw.values() if isinstance(v, dict)]
+        if children and any("hours" in c or "WINDSPD" in c for c in children):
+            return children
+
+    # shape C – list of model dicts
     if isinstance(fcst_raw, list):
-        fcst_block = {str(i): m for i, m in enumerate(fcst_raw) if isinstance(m, dict)}
-    elif isinstance(fcst_raw, dict):
-        fcst_block = {k: v for k, v in fcst_raw.items() if isinstance(v, dict)}
-    else:
-        log.warning("  Unexpected fcst type: %s", type(fcst_raw))
+        children = [v for v in fcst_raw if isinstance(v, dict)]
+        if children and any("hours" in c or "WINDSPD" in c for c in children):
+            return children
+
+    # shape A – the forecast arrays live directly in raw (single model response)
+    if "hours" in raw or "WINDSPD" in raw or "fcst_hour_idx" in raw:
+        # merge top-level model metadata with whatever is in fcst (if dict)
+        md = dict(raw)
+        if isinstance(fcst_raw, dict):
+            md.update(fcst_raw)
+        return [md]
+
+    # shape A variant – arrays are inside fcst dict but no child dicts
+    if isinstance(fcst_raw, dict) and ("hours" in fcst_raw or "WINDSPD" in fcst_raw):
+        md = {**raw, **fcst_raw}
+        return [md]
+
+    return []
+
+
+def parse_windguru_forecasts(raw: dict) -> list[dict]:
+    records = []
+    model_blocks = _normalise_to_model_blocks(raw)
+
+    if not model_blocks:
+        log.warning("  Could not find forecast arrays. Raw keys: %s", list(raw.keys()))
+        log.warning("  fcst sample: %s", str(raw.get("fcst"))[:300])
         return []
 
-    if not fcst_block:
-        log.warning("  fcst block is empty. Raw keys: %s", list(raw.keys()))
-        return []
+    log.info("  Found %d model block(s). First block keys: %s",
+             len(model_blocks), list(model_blocks[0].keys())[:25])
 
-    # log first model's keys so we can see the actual field names
-    first = next(iter(fcst_block.values()))
-    log.info("  First model keys: %s", list(first.keys())[:20])
-
-    for model_id, md in fcst_block.items():
+    for md in model_blocks:
         model_name = (md.get("model_name") or md.get("name") or
-                      md.get("id_model") or model_id)
+                      str(md.get("id_model") or md.get("wgmodel") or "unknown"))
 
         # ── resolve init datetime ────────────────────────────────────────────
         # Windguru stores it as "YYYY-MM-DD HH:MM" in initdate, or epoch in init_d
@@ -272,12 +290,10 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
                 "precip_mm":      _safe(precip,      i),
             })
 
-    log.info("  Parsed %d hourly forecast records across %d models.",
-             len(records), len(fcst_block))
-    if not records:
-        # dump a sample model to help diagnose
-        sample_key = next(iter(fcst_block))
-        sample = fcst_block[sample_key]
+    log.info("  Parsed %d hourly forecast records across %d model block(s).",
+             len(records), len(model_blocks))
+    if not records and model_blocks:
+        sample = model_blocks[0]
         log.warning("  Sample model dump: %s",
                     {k: str(v)[:80] for k, v in sample.items()})
     return records
