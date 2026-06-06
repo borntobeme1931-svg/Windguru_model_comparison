@@ -284,12 +284,6 @@ def fetch_meteobase_measurement() -> dict | None:
     if parsed:
         return parsed
 
-    # ── attempt 3: Open-Meteo fallback ───────────────────────────────────────
-    log.info("  ↳ Falling back to Open-Meteo at WSA-Ipsach coordinates …")
-    parsed = _fetch_open_meteo()
-    if parsed:
-        return parsed
-
     log.error("  ✗ Could not retrieve any measurement.")
     return None
 
@@ -415,53 +409,6 @@ def _scrape_wsa_playwright() -> dict | None:
         log.warning("  WSA-Ipsach Playwright scrape failed: %s", exc)
         return None
 
-
-def _fetch_open_meteo() -> dict | None:
-    """
-    Free Open-Meteo API at WSA-Ipsach coordinates — no API key needed.
-    Used only if both WSA scrape attempts fail.
-    """
-    try:
-        now = utc_now()
-        r = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude":       STATION_LAT,
-                "longitude":      STATION_LON,
-                "hourly":         "temperature_2m,windspeed_10m,winddirection_10m,windgusts_10m,precipitation",
-                "windspeed_unit": "kn",
-                "timezone":       "UTC",
-                "forecast_days":  1,
-                "past_hours":     2,
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        data   = r.json()
-        hourly = data.get("hourly", {})
-        times  = hourly.get("time", [])
-        if not times:
-            return None
-
-        # Most recent completed hour
-        target = hour_key(now - timedelta(hours=1))
-        idx = next((i for i, t in enumerate(times) if t[:13] == target[:13]), -1)
-
-        result = {
-            "source":        f"Open-Meteo fallback (lat={STATION_LAT}, lon={STATION_LON})",
-            "obs_time_utc":  times[idx] + ":00+00:00",
-            "hour_key":      times[idx][:13],
-            "wind_speed_kn": _float(hourly.get("windspeed_10m",     [None])[idx]),
-            "wind_gust_kn":  _float(hourly.get("windgusts_10m",     [None])[idx]),
-            "wind_dir_deg":  _float(hourly.get("winddirection_10m", [None])[idx]),
-            "temp_c":        _float(hourly.get("temperature_2m",    [None])[idx]),
-            "precip_mm":     _float(hourly.get("precipitation",     [None])[idx]),
-        }
-        log.info("  ✓ Got Open-Meteo fallback measurement.")
-        return result
-    except Exception as exc:
-        log.debug("  Open-Meteo fetch failed: %s", exc)
-        return None
 
 
 def save_measurement(obs: dict) -> None:
