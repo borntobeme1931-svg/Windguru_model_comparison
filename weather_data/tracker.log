@@ -494,3 +494,28 @@ Call log:
 
 2026-06-08 18:55:37,755  WARNING     WSA-Ipsach: no usable data found in XHR or page text.
 2026-06-08 18:55:37,755  ERROR       ✗ Could not retrieve any measurement.
+2026-06-08 19:04:28,799  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-08 19:04:29,979  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-08 19:04:39,681  INFO        ✓ Got forecast via Playwright (28 models)
+2026-06-08 19:04:39,682  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'TMP', 'TCDC', 'APCP1', 'GUST', 'FLHGT', 'SLP', 'HCDC', 'MCDC', 'LCDC', 'RH']
+2026-06-08 19:04:39,683  INFO        Parsed 61 hourly forecast records across 1 model block(s).
+2026-06-08 19:04:39,684  INFO        Appended 61 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-08 19:04:39,684  INFO      Fetching WSA-Ipsach measurement ...
+2026-06-08 19:04:45,313  INFO        WSA page (238 chars):
+WSA-Ipsach
+
+08.06.2026 (CEST) 20:56 :: 440müM
+
+Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SSW
+Wind-10min-Max: 12.2km/h (6.6kn, 1Bf) W
+Gust-Factor (GF): 0 / Richtungstreue: 67%
+Wassertemperatur: 20.4°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-08 19:04:45,314  INFO        WSA parsed: wind=2.16 kn  gust=6.59 kn  dir=SSW (202.5 deg)
+2026-06-08 19:04:45,315  INFO        Appended measurement -> weather_data/measurements/2026-06.jsonl
