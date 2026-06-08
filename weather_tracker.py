@@ -423,132 +423,293 @@ def _deg_to_compass(deg: float | None) -> str | None:
 
 
 def _scrape_wsa_playwright() -> dict | None:
+    """
+    Intercept the XHR/fetch API calls that wsa-ipsach.meteobase.ch makes to its
+    data backend — the same network-interception technique used for Windguru.
+    This is more robust than waiting for the page to render, and sidesteps any
+    anti-bot measures on the HTML response.
+
+    Strategy:
+      1. Capture every JSON response from the meteobase.ch domain while the page
+         loads.  The backend typically calls something like /api/current or
+         /api/data or passes JSON in a query-string response.
+      2. Walk all captured payloads looking for wind / temperature keys.
+      3. Fall back to parsing the rendered page text if no JSON API is found
+         (e.g. the site switched to server-side rendering).
+    """
     if not PLAYWRIGHT_AVAILABLE:
         log.warning("  Playwright not available — skipping browser scrape.")
         return None
 
+    captured_responses: list[dict] = []   # all JSON payloads from the domain
+    captured_page_text: list[str]  = []   # rendered body text (fallback)
+
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            page    = browser.new_page()
-            page.goto("https://wsa-ipsach.meteobase.ch/", timeout=30_000)
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox"],
+            )
+            ctx  = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+                ),
+                extra_http_headers={"Accept-Language": "de-CH,de;q=0.9,en;q=0.8"},
+            )
+            page = ctx.new_page()
 
-            # Wait for content to appear
-            for selector in ["table", "td", ".messwert", "#content", "div"]:
+            # ── intercept all responses from the meteobase domain ────────────
+            def on_response(response):
                 try:
-                    page.wait_for_selector(selector, timeout=10_000)
-                    break
+                    if "meteobase.ch" not in response.url:
+                        return
+                    ct = response.headers.get("content-type", "")
+                    if "json" in ct or response.url.endswith((".json", ".php")):
+                        body = response.json()
+                        captured_responses.append({"url": response.url, "body": body})
+                        log.debug("  WSA XHR captured: %s → %s",
+                                  response.url, str(body)[:200])
                 except Exception:
-                    pass
+                    pass  # non-JSON or empty body — ignore
 
-            page.wait_for_timeout(5_000)
+            page.on("response", on_response)
 
-            # Get text; fall back to frames, then raw HTML
-            page_text = page.inner_text("body").strip()
-            if not page_text:
-                for frame in page.frames:
-                    try:
-                        ft = frame.inner_text("body").strip()
-                        if len(ft) > len(page_text):
-                            page_text = ft
-                    except Exception:
-                        pass
-            if len(page_text) < 100:
-                page_text = page.content()
+            try:
+                page.goto("https://wsa-ipsach.meteobase.ch/",
+                          wait_until="networkidle", timeout=30_000)
+            except Exception as nav_exc:
+                log.warning("  WSA navigation warning: %s", nav_exc)
+
+            # Give JS a moment to fire any deferred data fetches
+            page.wait_for_timeout(4_000)
+
+            # Grab rendered text as fallback
+            try:
+                txt = page.inner_text("body").strip()
+                if txt:
+                    captured_page_text.append(txt)
+            except Exception:
+                pass
 
             browser.close()
 
-        log.info("  WSA page text (%d chars):\n%s", len(page_text), page_text[:5000])
-
-        def after_label(label: str):
-            """
-            Find label in page text and return (numeric_value, unit_str) tuple.
-            Handles values like "14.8km/h", "14.8 km/h", "14.8", "WSW".
-            """
-            idx = page_text.find(label)
-            if idx == -1:
-                return None, None
-            snippet = page_text[idx + len(label):idx + len(label) + 80].strip()
-            # match: optional sign, digits, optional decimal, then optional unit
-            m = re.search(r"([+-]?\d+[.,]?\d*)\s*(km/h|m/s|°C|°c|mm|%)?", snippet)
-            if m:
-                num = m.group(1).replace(",", ".")
-                unit = (m.group(2) or "").lower()
-                return num, unit
-            # no number — return raw word (for direction)
-            w = re.search(r"([A-Za-zÄÖÜäöüß/-]+)", snippet)
-            return (w.group(1), "") if w else (None, None)
-
-        def after_label_str(label: str) -> str | None:
-            """Return raw word token after label (for direction)."""
-            idx = page_text.find(label)
-            if idx == -1:
-                return None
-            snippet = page_text[idx + len(label):idx + len(label) + 40].strip()
-            m = re.search(r"([A-Za-z]+)", snippet)
-            return m.group(1) if m else None
-
-        def get_num(label: str, *fallbacks: str):
-            """Try each label in order; return (num_str, unit_str) for the first match."""
-            for lbl in (label, *fallbacks):
-                num, unit = after_label(lbl)
-                if num is not None:
-                    return num, unit
-            return None, None
-
-        # ── wind speed (10-min average) ──────────────────────────────────────
-        ws_num, ws_unit = get_num("Wind-10min-Ø:", "Wind-10min-O:", "Wind-Ø:", "Windgeschwindigkeit:")
-        # ── wind gust (10-min max) ───────────────────────────────────────────
-        wg_num, wg_unit = get_num("Wind-10min-Max:", "Windböe:", "Böe:", "Bö:")
-        # ── wind direction ───────────────────────────────────────────────────
-        wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:")
-                  or after_label_str("Wind-Richtung:") or after_label_str("Windrichtung"))
-        # ── temperature ──────────────────────────────────────────────────────
-        tc_num, _ = get_num("Lufttemperatur:", "Temperatur:", "Temp.:", "Lufttemp.:")
-        # ── precipitation ────────────────────────────────────────────────────
-        rr_num, _ = get_num("Niederschlag:", "Niederschlag 10min:", "Regen:", "Regenmenge:")
-
-        log.info("  WSA tokens: ws=%s(%s) wg=%s(%s) wd=%s tc=%s rr=%s",
-                 ws_num, ws_unit, wg_num, wg_unit, wd_raw, tc_num, rr_num)
-
-        def to_knots(num_str, unit_str):
-            v = _float(num_str)
-            if v is None:
-                return None
-            if unit_str == "m/s":
-                return _knots_from_ms(v)
-            return _knots_from_kmh(v)  # default: km/h
-
-        ws_kn  = to_knots(ws_num, ws_unit)
-        wg_kn  = to_knots(wg_num, wg_unit)
-        wd_deg = _dir_to_deg(wd_raw)
-        wd_txt = _deg_to_compass(wd_deg) or (wd_raw.strip().upper() if wd_raw else None)
-        tc     = _float(tc_num)
-        rr     = _float(rr_num)
-
-        if ws_kn is None and tc is None:
-            log.warning("  WSA-Ipsach: could not extract any usable values.")
-            return None
-
-        now = utc_now()
-        result = {
-            "source":        "wsa-ipsach.meteobase.ch (playwright)",
-            "obs_time_utc":  now.isoformat(),
-            "hour_key":      hour_key(now),
-            "wind_speed_kn": ws_kn,
-            "wind_gust_kn":  wg_kn,
-            "wind_dir_deg":  wd_deg,
-            "wind_dir_txt":  wd_txt,
-            "temp_c":        tc,
-            "precip_mm":     rr,
-        }
-        log.info("  ✓ WSA-Ipsach: wind=%s kn gust=%s kn dir=%s (%s°) temp=%s°C",
-                 ws_kn, wg_kn, wd_txt, wd_deg, tc)
-        return result
-
     except Exception as exc:
-        log.warning("  WSA-Ipsach Playwright scrape failed: %s", exc)
+        log.warning("  WSA-Ipsach Playwright failed: %s", exc)
         return None
+
+    # ── attempt 1: parse captured JSON API responses ─────────────────────────
+    if captured_responses:
+        log.info("  WSA: intercepted %d JSON response(s)", len(captured_responses))
+        for item in captured_responses:
+            parsed = _parse_wsa_api_response(item["url"], item["body"])
+            if parsed:
+                log.info("  ✓ WSA-Ipsach from XHR: wind=%s kn gust=%s kn "
+                         "dir=%s (%s°) temp=%s°C",
+                         parsed.get("wind_speed_kn"), parsed.get("wind_gust_kn"),
+                         parsed.get("wind_dir_txt"), parsed.get("wind_dir_deg"),
+                         parsed.get("temp_c"))
+                return parsed
+        log.debug("  WSA: JSON responses found but no wind/temp data extracted.")
+
+    # ── attempt 2: parse rendered page text ──────────────────────────────────
+    page_text = "\n".join(captured_page_text)
+    if page_text:
+        log.info("  WSA: falling back to page-text parse (%d chars)", len(page_text))
+        log.debug("  WSA page text sample:\n%s", page_text[:3000])
+        parsed = _parse_wsa_page_text(page_text)
+        if parsed:
+            log.info("  ✓ WSA-Ipsach from page text: wind=%s kn gust=%s kn "
+                     "dir=%s (%s°) temp=%s°C",
+                     parsed.get("wind_speed_kn"), parsed.get("wind_gust_kn"),
+                     parsed.get("wind_dir_txt"), parsed.get("wind_dir_deg"),
+                     parsed.get("temp_c"))
+            return parsed
+
+    log.warning("  WSA-Ipsach: no usable data found in XHR or page text.")
+    return None
+
+
+def _parse_wsa_api_response(url: str, data) -> dict | None:
+    """
+    Try to extract weather readings from a JSON payload captured from the
+    meteobase.ch backend.  The payload can be:
+      - a dict with sensor keys at the top level
+      - a list of sensor dicts  {"name": "WindSpeed", "value": 14.2, "unit": "km/h"}
+      - a nested structure  {"data": {"sensors": [...]}}
+    """
+    now = utc_now()
+
+    def _search(obj, depth=0) -> dict:
+        """Recursively search obj for wind/temp keys; return best candidate dict."""
+        if depth > 5:
+            return {}
+        if isinstance(obj, dict):
+            keys_lc = {k.lower(): k for k in obj}
+            # direct hit: dict has wind speed key
+            wind_hits = [k for k in keys_lc if any(
+                tok in k for tok in ("wind", "ws", "windspd", "geschw"))]
+            if wind_hits:
+                return obj
+            # recurse into values
+            best = {}
+            for v in obj.values():
+                candidate = _search(v, depth + 1)
+                if len(candidate) > len(best):
+                    best = candidate
+            return best
+        if isinstance(obj, list):
+            # list of sensor-dicts: [{"name": "...", "value": ..., "unit": "..."}]
+            if all(isinstance(x, dict) and "name" in x for x in obj[:5]):
+                merged: dict = {}
+                for sensor in obj:
+                    name = str(sensor.get("name", "")).lower().strip()
+                    val  = sensor.get("value") or sensor.get("val")
+                    unit = str(sensor.get("unit", "")).lower()
+                    merged[name] = {"value": val, "unit": unit}
+                return merged
+            best = {}
+            for item in obj:
+                candidate = _search(item, depth + 1)
+                if len(candidate) > len(best):
+                    best = candidate
+            return best
+        return {}
+
+    flat = _search(data)
+    if not flat:
+        return None
+
+    def _get_val(keys: list[str]):
+        """Return (numeric_value, unit_string) for the first matching key."""
+        for k in keys:
+            for fk, fv in flat.items():
+                if k in fk.lower():
+                    if isinstance(fv, dict):
+                        return _float(fv.get("value")), str(fv.get("unit", "")).lower()
+                    return _float(fv), ""
+        return None, ""
+
+    ws_v, ws_u = _get_val(["wind-10min-ø", "wind_avg", "windgeschw", "windspd",
+                            "wind speed", "windspeed", "ws"])
+    wg_v, wg_u = _get_val(["wind-10min-max", "gust", "windböe", "böe", "bö",
+                            "wind_gust", "windgust", "wg"])
+    wd_v, wd_u = _get_val(["windrichtung", "wind_dir", "winddir", "direction", "wd"])
+    tc_v, _    = _get_val(["lufttemp", "temperatur", "temp", "ta"])
+    rr_v, _    = _get_val(["niederschlag", "regen", "precip", "rain", "rr"])
+
+    if ws_v is None and tc_v is None:
+        return None
+
+    def to_kn(v, u):
+        if v is None:
+            return None
+        if "m/s" in u:
+            return _knots_from_ms(v)
+        return _knots_from_kmh(v)  # default km/h
+
+    ws_kn  = to_kn(ws_v, ws_u)
+    wg_kn  = to_kn(wg_v, wg_u)
+
+    # direction can be numeric degrees or text label
+    if wd_v is not None:
+        wd_deg = wd_v if isinstance(wd_v, float) else _dir_to_deg(str(wd_v))
+    else:
+        wd_deg = None
+    # try string value from the raw sensor dict if numeric lookup failed
+    if wd_deg is None:
+        for fk, fv in flat.items():
+            if any(tok in fk.lower() for tok in ("windrichtung", "wind_dir", "direction")):
+                raw_str = str(fv.get("value", fv) if isinstance(fv, dict) else fv)
+                wd_deg = _dir_to_deg(raw_str)
+                if wd_deg is not None:
+                    break
+    wd_txt = _deg_to_compass(wd_deg)
+
+    return {
+        "source":        f"wsa-ipsach.meteobase.ch (xhr: {url})",
+        "obs_time_utc":  now.isoformat(),
+        "hour_key":      hour_key(now),
+        "wind_speed_kn": ws_kn,
+        "wind_gust_kn":  wg_kn,
+        "wind_dir_deg":  wd_deg,
+        "wind_dir_txt":  wd_txt,
+        "temp_c":        tc_v,
+        "precip_mm":     rr_v,
+    }
+
+
+def _parse_wsa_page_text(page_text: str) -> dict | None:
+    """
+    Parse rendered page text for label-based weather values.
+    Handles German labels as found on meteobase.ch station pages.
+    """
+    now = utc_now()
+
+    def after_label(label: str):
+        idx = page_text.find(label)
+        if idx == -1:
+            return None, None
+        snippet = page_text[idx + len(label):idx + len(label) + 80].strip()
+        m = re.search(r"([+-]?\d+[.,]?\d*)\s*(km/h|m/s|°[Cc]|mm|%)?", snippet)
+        if m:
+            return m.group(1).replace(",", "."), (m.group(2) or "").lower()
+        w = re.search(r"([A-Za-zÄÖÜäöüß/-]+)", snippet)
+        return (w.group(1), "") if w else (None, None)
+
+    def after_label_str(label: str) -> str | None:
+        idx = page_text.find(label)
+        if idx == -1:
+            return None
+        snippet = page_text[idx + len(label):idx + len(label) + 40].strip()
+        m = re.search(r"([A-Za-z]+)", snippet)
+        return m.group(1) if m else None
+
+    def get_num(label: str, *fallbacks: str):
+        for lbl in (label, *fallbacks):
+            num, unit = after_label(lbl)
+            if num is not None:
+                return num, unit
+        return None, None
+
+    ws_num, ws_unit = get_num("Wind-10min-Ø:", "Wind-10min-O:", "Wind-Ø:",
+                               "Windgeschwindigkeit:")
+    wg_num, wg_unit = get_num("Wind-10min-Max:", "Windböe:", "Böe:", "Bö:")
+    wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:")
+              or after_label_str("Wind-Richtung:") or after_label_str("Windrichtung"))
+    tc_num, _ = get_num("Lufttemperatur:", "Temperatur:", "Temp.:", "Lufttemp.:")
+    rr_num, _ = get_num("Niederschlag:", "Niederschlag 10min:", "Regen:", "Regenmenge:")
+
+    log.info("  WSA text tokens: ws=%s(%s) wg=%s(%s) wd=%s tc=%s rr=%s",
+             ws_num, ws_unit, wg_num, wg_unit, wd_raw, tc_num, rr_num)
+
+    def to_knots(num_str, unit_str):
+        v = _float(num_str)
+        if v is None:
+            return None
+        return _knots_from_ms(v) if unit_str == "m/s" else _knots_from_kmh(v)
+
+    ws_kn  = to_knots(ws_num, ws_unit)
+    wg_kn  = to_knots(wg_num, wg_unit)
+    wd_deg = _dir_to_deg(wd_raw)
+    wd_txt = _deg_to_compass(wd_deg) or (wd_raw.strip().upper() if wd_raw else None)
+    tc     = _float(tc_num)
+    rr     = _float(rr_num)
+
+    if ws_kn is None and tc is None:
+        return None
+
+    return {
+        "source":        "wsa-ipsach.meteobase.ch (page-text)",
+        "obs_time_utc":  now.isoformat(),
+        "hour_key":      hour_key(now),
+        "wind_speed_kn": ws_kn,
+        "wind_gust_kn":  wg_kn,
+        "wind_dir_deg":  wd_deg,
+        "wind_dir_txt":  wd_txt,
+        "temp_c":        tc,
+        "precip_mm":     rr,
+    }
 
 
 def save_measurement(obs: dict) -> None:
