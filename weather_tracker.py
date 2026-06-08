@@ -515,7 +515,7 @@ def _scrape_wsa_playwright() -> dict | None:
     # ── attempt 2: parse rendered page text ──────────────────────────────────
     page_text = "\n".join(captured_page_text)
     if page_text:
-        log.info("  WSA: falling back to page-text parse (%d chars)", len(page_text))
+        log.info("  WSA: falling back to page-text parse (%d chars):\n%s", len(page_text), page_text)
         log.debug("  WSA page text sample:\n%s", page_text[:3000])
         parsed = _parse_wsa_page_text(page_text)
         if parsed:
