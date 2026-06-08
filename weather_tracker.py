@@ -471,6 +471,27 @@ def _scrape_wsa() -> dict | None:
 
 # ── 3. Collection entry-point ─────────────────────────────────────────────────
 
+def save_measurement(obs: dict) -> None:
+    """Append to monthly JSONL. Skips if this hour is already recorded."""
+    now = utc_now()
+    fp  = measurement_file(now)
+    hk  = hour_key(now)
+
+    if fp.exists():
+        with fp.open("r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    if json.loads(line.strip()).get("hour_key") == hk:
+                        log.info("  Measurement for %s already recorded — skipping.", hk)
+                        return
+                except Exception:
+                    pass
+
+    with fp.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(obs) + "\n")
+    log.info("  Appended measurement -> %s", fp)
+
+
 def collect() -> None:
     now = utc_now().replace(minute=0, second=0, microsecond=0)
 
