@@ -481,3 +481,16 @@ Wassertemperatur: 20.4°C
 2026-06-08 18:49:19,640  INFO        WSA text tokens: ws=4(km/h) wg=10.1(km/h) wd=None tc=None rr=None
 2026-06-08 18:49:19,640  INFO        ✓ WSA-Ipsach from page text: wind=2.16 kn gust=5.45 kn dir=None (None°) temp=None°C
 2026-06-08 18:49:19,640  INFO        Measurement for 2026-06-08T18 already recorded — skipping.
+2026-06-08 18:53:50,803  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-08 18:53:51,560  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-08 18:54:02,207  INFO        ✓ Got forecast via Playwright (29 models)
+2026-06-08 18:54:02,207  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'TMP', 'TCDC', 'APCP1', 'GUST', 'FLHGT', 'SLP', 'HCDC', 'MCDC', 'LCDC', 'RH']
+2026-06-08 18:54:02,209  INFO        Parsed 76 hourly forecast records across 1 model block(s).
+2026-06-08 18:54:02,210  INFO        Appended 76 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-08 18:54:02,210  INFO      Fetching WSA-Ipsach measurement …
+2026-06-08 18:55:03,708  WARNING     WSA navigation warning: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "https://wsa-ipsach.meteobase.ch/", waiting until "networkidle"
+
+2026-06-08 18:55:37,755  WARNING     WSA-Ipsach: no usable data found in XHR or page text.
+2026-06-08 18:55:37,755  ERROR       ✗ Could not retrieve any measurement.
