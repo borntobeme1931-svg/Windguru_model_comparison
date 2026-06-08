@@ -672,12 +672,44 @@ def _parse_wsa_page_text(page_text: str) -> dict | None:
                 return num, unit
         return None, None
 
-    ws_num, ws_unit = get_num("Wind-10min-Ø:", "Wind-10min-O:", "Wind-Ø:",
-                               "Windgeschwindigkeit:")
-    wg_num, wg_unit = get_num("Wind-10min-Max:", "Windböe:", "Böe:", "Bö:")
-    wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:")
-              or after_label_str("Wind-Richtung:") or after_label_str("Windrichtung"))
-    tc_num, _ = get_num("Lufttemperatur:", "Temperatur:", "Temp.:", "Lufttemp.:")
+    # Page format: "Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SW"
+    # Direction is at the END of the wind line, after the Bf rating.
+    # Extract wind lines with a regex that captures speed, optional knots, and direction.
+    ws_num = ws_unit = wg_num = wg_unit = wd_raw = tc_num = rr_num = None
+
+    # Wind average line: capture km/h value, optional knots in parens, trailing direction
+    m_ws = re.search(
+        r"Wind-10min-[ØO]:\s*([\d.,]+)\s*(km/h|m/s)"
+        r"(?:\s*\([\d.,]+\s*kn[^)]*\))?"   # optional "(X.Xkn, YBf)"
+        r"\s*([A-Z]{1,3})?",                # optional direction label
+        page_text)
+    if m_ws:
+        ws_num, ws_unit = m_ws.group(1), (m_ws.group(2) or "km/h").lower()
+        wd_raw = m_ws.group(3)  # e.g. "SW", "SSW", "NNO"
+
+    # Wind gust line: same format
+    m_wg = re.search(
+        r"Wind-10min-Max:\s*([\d.,]+)\s*(km/h|m/s)"
+        r"(?:\s*\([\d.,]+\s*kn[^)]*\))?",
+        page_text)
+    if m_wg:
+        wg_num, wg_unit = m_wg.group(1), (m_wg.group(2) or "km/h").lower()
+
+    # If direction not on avg line, try gust line or standalone label
+    if not wd_raw:
+        m_wgd = re.search(
+            r"Wind-10min-Max:.*?(?:\([^)]*\))?\s*([A-Z]{1,3})\s*$",
+            page_text, re.MULTILINE)
+        if m_wgd:
+            wd_raw = m_wgd.group(1)
+    if not wd_raw:
+        wd_raw = (after_label_str("Windrichtung:") or after_label_str("Richtung:"))
+
+    # Temperature: site shows Wassertemperatur (water), not air temp — skip unless
+    # an air temp label is present.
+    tc_num, _ = get_num("Lufttemperatur:", "Lufttemp.:", "Temperatur:", "Temp.:")
+    # Do NOT fall back to Wassertemperatur — it's water, not air.
+
     rr_num, _ = get_num("Niederschlag:", "Niederschlag 10min:", "Regen:", "Regenmenge:")
 
     log.info("  WSA text tokens: ws=%s(%s) wg=%s(%s) wd=%s tc=%s rr=%s",
