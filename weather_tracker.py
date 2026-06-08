@@ -133,11 +133,17 @@ def _windguru_internal_api(spot_id: int) -> dict | None:
 
 
 def _windguru_playwright(spot_id: int) -> dict | None:
+    """
+    Windguru fires one iapi.php?q=forecast request PER MODEL as the page loads.
+    We intercept ALL of them, then stitch them into a single multi-model dict
+    shaped like: { "fcst": { "1": model_dict, "2": model_dict, ... } }
+    so the existing _normalise_to_model_blocks parser (shape B) handles it.
+    """
     if not PLAYWRIGHT_AVAILABLE:
         log.error("Playwright not installed.")
         return None
 
-    captured: dict | None = None
+    all_responses: list[dict] = []
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
@@ -145,31 +151,52 @@ def _windguru_playwright(spot_id: int) -> dict | None:
         page    = ctx.new_page()
 
         def handle_response(response):
-            nonlocal captured
             if "iapi.php" in response.url and "forecast" in response.url:
                 try:
-                    captured = response.json()
+                    all_responses.append(response.json())
                 except Exception:
                     pass
 
         page.on("response", handle_response)
         page.goto(f"https://www.windguru.cz/{spot_id}", timeout=30_000)
-        page.wait_for_timeout(8_000)
+        # Wait long enough for all per-model XHRs to complete (they stagger over ~15s)
+        page.wait_for_timeout(20_000)
         browser.close()
 
-    return captured
+    if not all_responses:
+        return None
+
+    log.info("  ✓ Got forecast via Playwright (%d model response(s))", len(all_responses))
+
+    # Stitch into shape B: { "fcst": { "1": {...}, "2": {...}, ... } }
+    merged_fcst: dict[str, dict] = {}
+    for i, resp in enumerate(all_responses):
+        # Each response is either already a model dict with hours/WINDSPD,
+        # or has a nested fcst block — normalise to a flat model dict.
+        if "hours" in resp or "WINDSPD" in resp:
+            model_dict = resp
+        elif isinstance(resp.get("fcst"), dict) and (
+            "hours" in resp["fcst"] or "WINDSPD" in resp["fcst"]
+        ):
+            model_dict = {**resp, **resp["fcst"]}
+        else:
+            model_dict = resp
+        key = str(i + 1)
+        merged_fcst[key] = model_dict
+
+    return {"fcst": merged_fcst}
 
 
 def fetch_windguru_forecasts(spot_id: int = WINDGURU_SPOT_ID) -> dict | None:
+    """
+    Always use Playwright to capture all per-model XHR responses.
+    The internal API only returns one model at a time (the default model),
+    so Playwright is the only way to get all models in one run.
+    """
     log.info("Fetching Windguru forecasts for spot %s …", spot_id)
-    data = _windguru_internal_api(spot_id)
-    if data and "fcst" in data:
-        log.info("  ✓ Got forecast via internal API (%d models)", len(data["fcst"]))
-        return data
-    log.info("  ↳ Internal API did not return forecast; trying Playwright …")
     data = _windguru_playwright(spot_id)
     if data and "fcst" in data:
-        log.info("  ✓ Got forecast via Playwright (%d models)", len(data["fcst"]))
+        log.info("  ✓ Got %d model(s) via Playwright", len(data["fcst"]))
         return data
     log.error("  ✗ Could not retrieve Windguru forecasts.")
     return None
