@@ -444,3 +444,14 @@ Call log:
   - navigating to "https://wsa-ipsach.meteobase.ch/", waiting until "load"
 
 2026-06-08 17:14:30,872  ERROR       ✗ Could not retrieve any measurement.
+2026-06-08 18:46:13,423  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-08 18:46:14,464  INFO        ↳ Internal API did not return forecast; trying Playwright …
+2026-06-08 18:46:23,885  INFO        ✓ Got forecast via Playwright (30 models)
+2026-06-08 18:46:23,885  INFO        Found 1 model block(s). First block keys: ['id_spot', 'lat', 'lon', 'alt', 'id_model', 'model', 'wgmodel', 'model_alt', 'levels', 'sunrise', 'sunset', 'md5chk', 'fcst', 'default_vars', 'initstamp', 'GUST', 'FLHGT', 'SLP', 'RH', 'TMP', 'TCDC', 'APCP', 'APCP1', 'HCDC', 'MCDC']
+2026-06-08 18:46:23,887  INFO        Parsed 93 hourly forecast records across 1 model block(s).
+2026-06-08 18:46:23,888  INFO        Appended 93 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-08 18:46:23,888  INFO      Fetching WSA-Ipsach measurement …
+2026-06-08 18:46:33,495  INFO        WSA: falling back to page-text parse (237 chars)
+2026-06-08 18:46:33,495  INFO        WSA text tokens: ws=3.2(km/h) wg=9.4(km/h) wd=None tc=None rr=None
+2026-06-08 18:46:33,495  INFO        ✓ WSA-Ipsach from page text: wind=1.73 kn gust=5.08 kn dir=None (None°) temp=None°C
+2026-06-08 18:46:33,496  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
