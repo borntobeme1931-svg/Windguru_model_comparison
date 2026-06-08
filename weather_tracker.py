@@ -312,6 +312,68 @@ def save_forecasts(records: list[dict], run_time: datetime) -> None:
     log.info("  Appended %d forecast records → %s", len(records), fp)
 
 
+
+def save_snapshot(records: list[dict], obs: dict | None, run_time: datetime) -> None:
+    """
+    Write a simple CSV with one row per model showing the current-hour forecast,
+    plus one row for the WSA-Ipsach measurement.
+    Columns: source, wind_speed_kn, wind_gust_kn, wind_dir_deg, wind_dir_txt
+    File:    weather_data/snapshots/YYYY-MM-DDTHH.csv  (one per hour, overwritten)
+    """
+    snap_dir = DATA_DIR / "snapshots"
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    fp = snap_dir / f"{run_time.strftime('%Y-%m-%dT%H')}.csv"
+
+    current_hk = hour_key(run_time)
+    rows = []
+
+    # One row per model: use the forecast valid for the current hour,
+    # falling back to the nearest available hour for that model.
+    by_model: dict[str, list[dict]] = {}
+    for r in records:
+        by_model.setdefault(r["model"], []).append(r)
+
+    for model, model_records in sorted(by_model.items()):
+        # prefer exact hour match, else closest future hour
+        exact = [r for r in model_records if r["hour_key"] == current_hk]
+        if exact:
+            r = exact[0]
+        else:
+            future = sorted(
+                [r for r in model_records if r["hour_key"] >= current_hk],
+                key=lambda x: x["hour_key"],
+            )
+            r = future[0] if future else model_records[0]
+        rows.append({
+            "source":        model,
+            "wind_speed_kn": r.get("wind_speed_kn"),
+            "wind_gust_kn":  r.get("wind_gust_kn"),
+            "wind_dir_deg":  r.get("wind_dir_deg"),
+            "wind_dir_txt":  r.get("wind_dir_txt"),
+        })
+
+    # WSA measurement row
+    if obs:
+        rows.append({
+            "source":        "WSA-Ipsach (measured)",
+            "wind_speed_kn": obs.get("wind_speed_kn"),
+            "wind_gust_kn":  obs.get("wind_gust_kn"),
+            "wind_dir_deg":  obs.get("wind_dir_deg"),
+            "wind_dir_txt":  obs.get("wind_dir_txt"),
+        })
+
+    with fp.open("w", encoding="utf-8", newline="") as f:
+        import csv
+        writer = csv.DictWriter(
+            f, fieldnames=["source","wind_speed_kn","wind_gust_kn","wind_dir_deg","wind_dir_txt"]
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+    log.info("  Snapshot saved -> %s  (%d model(s)%s)", fp, len(by_model),
+             " + WSA" if obs else "")
+
+
 # ── 2. WSA-Ipsach measurements ───────────────────────────────────────────────
 
 # Full 16-point compass (German: N=Nord, O=Ost, S=Süd, W=West)
@@ -505,6 +567,9 @@ def collect() -> None:
     obs = fetch_meteobase_measurement()
     if obs:
         save_measurement(obs)
+
+    if records or obs:
+        save_snapshot(records or [], obs, now)
 
 
 # ── 4. Analysis ───────────────────────────────────────────────────────────────
