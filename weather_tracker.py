@@ -431,17 +431,34 @@ def _scrape_wsa_playwright() -> dict | None:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
             page    = browser.new_page()
-            page.goto("https://wsa-ipsach.meteobase.ch/", timeout=20_000)
-            page.wait_for_timeout(3_000)
+            page.goto("https://wsa-ipsach.meteobase.ch/", timeout=30_000)
 
-            # Pull the full visible page text — the labels we need are plain text:
-            #   "Wind-10min-Ø:"  followed by the value
-            #   "Wind-10min-Max:" followed by the gust value
-            page_text = page.inner_text("body")
+            # Wait for content to appear
+            for selector in ["table", "td", ".messwert", "#content", "div"]:
+                try:
+                    page.wait_for_selector(selector, timeout=10_000)
+                    break
+                except Exception:
+                    pass
+
+            page.wait_for_timeout(5_000)
+
+            # Get text; fall back to frames, then raw HTML
+            page_text = page.inner_text("body").strip()
+            if not page_text:
+                for frame in page.frames:
+                    try:
+                        ft = frame.inner_text("body").strip()
+                        if len(ft) > len(page_text):
+                            page_text = ft
+                    except Exception:
+                        pass
+            if len(page_text) < 100:
+                page_text = page.content()
+
             browser.close()
 
-        # log full page text so we can see all labels if extraction fails
-        log.info("  WSA full page text:\n%s", page_text[:5000])
+        log.info("  WSA page text (%d chars):\n%s", len(page_text), page_text[:5000])
 
         def after_label(label: str):
             """
