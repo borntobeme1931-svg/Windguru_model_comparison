@@ -416,17 +416,20 @@ def _scrape_wsa() -> dict | None:
 
     # Pattern: "Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SW"
     # Captures: speed, unit, optional (knots block), optional direction label
+    # Format: "Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SW"
+    # Capture the knot value from the parentheses directly — more accurate
+    # than converting from km/h ourselves.
     WIND_RE = re.compile(
-        r"Wind-10min-[" + "\u00d8" + r"O]:\s*"
-        r"([\d.,]+)\s*(km/h|m/s)"
-        r"(?:\s*\([^)]*\))?"
-        r"\s*([A-Z]{1,3})?",
+        r"Wind-10min-[\u00d8O]:\s*"
+        r"[\d.,]+\s*(?:km/h|m/s)"           # km/h value (ignored)
+        r"\s*\(([\d.,]+)\s*kn[^)]*\)"    # (X.Xkn ...) — capture knots
+        r"\s*([A-Z]{1,3})?",                  # optional direction
         re.IGNORECASE,
     )
     GUST_RE = re.compile(
         r"Wind-10min-Max:\s*"
-        r"([\d.,]+)\s*(km/h|m/s)"
-        r"(?:\s*\([^)]*\))?",
+        r"[\d.,]+\s*(?:km/h|m/s)"
+        r"\s*\(([\d.,]+)\s*kn[^)]*\)",   # (X.Xkn ...)
         re.IGNORECASE,
     )
 
@@ -434,18 +437,14 @@ def _scrape_wsa() -> dict | None:
 
     m_ws = WIND_RE.search(page_text)
     if m_ws:
-        v = _float(m_ws.group(1))
-        u = (m_ws.group(2) or "km/h").lower()
-        ws_kn  = _knots_from_ms(v) if u == "m/s" else _knots_from_kmh(v)
-        wd_raw = m_ws.group(3)      # e.g. "SW", "NNO", or None
+        ws_kn  = _float(m_ws.group(1))        # already in knots
+        wd_raw = m_ws.group(2)                 # e.g. "SW", "NNO", or None
         wd_deg = _dir_to_deg(wd_raw)
         wd_txt = wd_raw.upper() if wd_raw else None
 
     m_wg = GUST_RE.search(page_text)
     if m_wg:
-        v = _float(m_wg.group(1))
-        u = (m_wg.group(2) or "km/h").lower()
-        wg_kn = _knots_from_ms(v) if u == "m/s" else _knots_from_kmh(v)
+        wg_kn = _float(m_wg.group(1))         # already in knots
 
     log.info("  WSA parsed: wind=%s kn  gust=%s kn  dir=%s (%s deg)",
              ws_kn, wg_kn, wd_txt, wd_deg)
