@@ -597,3 +597,30 @@ Wassertemperatur: 20.4°C
 2026-06-08 19:19:13,159  INFO        WSA parsed: wind=6.6 kn  gust=9.3 kn  dir=WSW (247.5 deg)
 2026-06-08 19:19:13,160  INFO        Measurement for 2026-06-08T19 already recorded — skipping.
 2026-06-08 19:19:13,161  INFO        Snapshot saved -> weather_data/snapshots/2026-06-08T19.csv  (16 model(s) + WSA)
+2026-06-08 19:28:07,816  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-08 19:28:29,783  INFO        ✓ Got forecast via Playwright (33 model response(s))
+2026-06-08 19:28:29,783  INFO        ✓ Got 33 model(s) via Playwright
+2026-06-08 19:28:29,783  INFO        Found 33 model block(s). First block keys: ['tabs', 'tabs_hidden', 'spots', 'message']
+2026-06-08 19:28:29,783  WARNING     Model unknown: no time axis found, skipping.
+2026-06-08 19:28:29,796  INFO        Parsed 2282 hourly forecast records across 33 model block(s).
+2026-06-08 19:28:29,801  INFO        Appended 2282 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-08 19:28:29,801  INFO      Fetching WSA-Ipsach measurement ...
+2026-06-08 19:28:35,258  INFO        WSA page (239 chars):
+WSA-Ipsach
+
+08.06.2026 (CEST) 21:26 :: 440müM
+
+Wind-10min-Ø: 4.7km/h (2.5kn, 1Bf) S
+Wind-10min-Max: 8.6km/h (4.6kn, 1Bf) WSW
+Gust-Factor (GF): 0 / Richtungstreue: 74%
+Wassertemperatur: 20.4°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-08 19:28:35,259  INFO        WSA parsed: wind=2.5 kn  gust=4.6 kn  dir=S (180.0 deg)
+2026-06-08 19:28:35,259  INFO        Appended measurement -> weather_data/measurements/2026-06.jsonl
+2026-06-08 19:28:35,260  INFO        Snapshot saved -> weather_data/snapshots/2026-06-08T19.csv  (16 model(s) + WSA)
