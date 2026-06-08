@@ -441,9 +441,7 @@ def _scrape_wsa_playwright() -> dict | None:
             browser.close()
 
         # log full page text so we can see all labels if extraction fails
-        # Log every line that contains a colon — these are the label:value pairs
-        colon_lines = [l.strip() for l in page_text.splitlines() if ":" in l and l.strip()]
-        log.info("  WSA label lines:\n%s", "\n".join(colon_lines[:60]))
+        log.info("  WSA full page text:\n%s", page_text[:5000])
 
         def after_label(label: str):
             """
