@@ -110,23 +110,38 @@ def _has_wind_data(text: str) -> bool:
 
 
 def _fetch_wsa_requests() -> str:
-    """Try plain HTTP first — fast and no browser needed."""
-    import requests as _req
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-    }
+    """
+    Try curl_cffi first — impersonates a real Chrome browser at TLS level,
+    bypassing Cloudflare and most bot-detection. Falls back to plain requests.
+    """
+    url = "https://wsa-ipsach.meteobase.ch/"
+    # attempt 1: curl_cffi (TLS fingerprint impersonation)
     try:
-        r = _req.get("https://wsa-ipsach.meteobase.ch/",
-                     headers=headers, timeout=15)
+        from curl_cffi import requests as cffi_req
+        r = cffi_req.get(url, impersonate="chrome124", timeout=15)
         r.raise_for_status()
-        # Strip HTML tags to get plain text
+        text = re.sub(r"<[^>]+>", " ", r.text)
+        text = re.sub(r"[ \t]+", " ", text).strip()
+        log.info("  WSA via curl_cffi (%d chars)", len(text))
+        return text
+    except ImportError:
+        log.debug("  curl_cffi not available, trying plain requests")
+    except Exception as exc:
+        log.warning("  WSA curl_cffi failed: %s", exc)
+
+    # attempt 2: plain requests
+    try:
+        import requests as _req
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
+        }
+        r = _req.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
         text = re.sub(r"<[^>]+>", " ", r.text)
         text = re.sub(r"[ \t]+", " ", text).strip()
         log.info("  WSA via requests (%d chars)", len(text))
