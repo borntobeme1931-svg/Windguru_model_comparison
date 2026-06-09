@@ -2,7 +2,7 @@ name: Collect Windguru forecasts
 
 on:
   schedule:
-    - cron: '10 0,3,6,9,12,15,18,21 * * *'   # every 3 hours, at :10 past
+    - cron: '10 0,6,12,18 * * *'   # 4x daily at 0:10, 6:10, 12:10, 18:10 UTC
   workflow_dispatch:
 
 env:
