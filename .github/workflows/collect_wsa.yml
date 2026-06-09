@@ -2,7 +2,7 @@ name: Collect WSA measurement
 
 on:
   schedule:
-    - cron: '0,30 * * * *'   # every 30 minutes
+    - cron: '0,15,30,45 * * * *'   # every 30 minutes
   workflow_dispatch:
 
 env:
