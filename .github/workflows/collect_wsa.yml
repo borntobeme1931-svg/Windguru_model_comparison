@@ -1,0 +1,45 @@
+name: Collect WSA measurement
+
+on:
+  schedule:
+    - cron: '0,15,30,45 * * * *'   # every 15 minutes
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  collect-wsa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-v1
+
+      - name: Install dependencies
+        run: pip install requests playwright
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Collect WSA measurement
+        run: python collect_wsa.py
+
+      - name: Commit data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add weather_data/
+          git diff --cached --quiet || git commit -m "wsa: $(date -u '+%Y-%m-%dT%H:%MZ')"
+          git push
