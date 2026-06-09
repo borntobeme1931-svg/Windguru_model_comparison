@@ -20,3 +20,43 @@
 2026-06-09 06:31:44,748  INFO        Parsed 474 hourly forecast records across 33 model block(s).
 2026-06-09 06:31:44,750  INFO        Appended 474 forecast records → weather_data/forecasts/2026-06.jsonl
 2026-06-09 06:31:44,750  INFO        Snapshot saved → weather_data/snapshots/2026-06-09T06_windguru.csv  (4 model(s))
+2026-06-09 06:44:49,738  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-09 06:45:12,033  INFO        ✓ Got forecast via Playwright (33 model response(s))
+2026-06-09 06:45:12,033  INFO        ✓ Got 33 model(s) via Playwright
+2026-06-09 06:45:12,033  INFO        Found 33 model block(s). First block keys: ['tabs', 'tabs_hidden', 'spots', 'message']
+2026-06-09 06:45:12,033  INFO        Skipping model: unknown
+2026-06-09 06:45:12,033  INFO        Skipping model: ICON-CH 1 km
+2026-06-09 06:45:12,033  INFO        Skipping model: ICON 2.2 km
+2026-06-09 06:45:12,033  INFO        Skipping model: Zephr-HD 2.6 km
+2026-06-09 06:45:12,034  INFO        Skipping model: UKV 2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: Zephr-HD 2.6 km
+2026-06-09 06:45:12,034  INFO        Skipping model: UKV 2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: HARM-DK 2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON 7 km
+2026-06-09 06:45:12,034  INFO        Skipping model: HARM-DK 2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: AROME-FR 1.3 km
+2026-06-09 06:45:12,034  INFO        Skipping model: AROME-FR 1.3 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON-CH 1 km
+2026-06-09 06:45:12,034  INFO        Skipping model: GFS 13 km
+2026-06-09 06:45:12,034  INFO        Skipping model: AROME-AT 2.5 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ALADIN 2.3 km
+2026-06-09 06:45:12,034  INFO        Skipping model: GDPS 15 km
+2026-06-09 06:45:12,034  INFO        Skipping model: GFS 13 km
+2026-06-09 06:45:12,034  INFO        Skipping model: GDPS 15 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON 13 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON 2.2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON 13 km
+2026-06-09 06:45:12,034  INFO        Skipping model: AROME-AT 2.5 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON-2I 2.2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ALADIN 2.3 km
+2026-06-09 06:45:12,034  INFO        Skipping model: WRF 9 km
+2026-06-09 06:45:12,034  INFO        Skipping model: IFS-HRES 9 km
+2026-06-09 06:45:12,034  INFO        Skipping model: WRF 9 km
+2026-06-09 06:45:12,034  INFO        Skipping model: IFS-HRES 9 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON 7 km
+2026-06-09 06:45:12,034  INFO        Skipping model: ICON-2I 2.2 km
+2026-06-09 06:45:12,034  INFO        Skipping model: HARMONIE 5 km
+2026-06-09 06:45:12,034  INFO        Skipping model: HARMONIE 5 km
+2026-06-09 06:45:12,034  INFO        Parsed 0 hourly forecast records across 33 model block(s).
+2026-06-09 06:45:12,035  WARNING     Sample model dump: {'tabs': "[{'share': True, 'id_spot': '56996', 'lat': 47.128, 'lon': 7.229, 'id_model': 10", 'tabs_hidden': '[]', 'spots': "{'56996': {'id_spot': '56996', 'id_user': '169', 'spotname': 'Bielersee, Nidau',", 'message': '<a href="/help.php?sec=pro" data-ajax="1" data-addclass="hcenter vcenter"><div c'}
+2026-06-09 06:45:12,035  ERROR       ✗ Parser returned 0 records.
