@@ -22,7 +22,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install requests playwright
+        run: pip install requests playwright curl_cffi
 
       - name: Cache Playwright browsers
         id: playwright-cache
