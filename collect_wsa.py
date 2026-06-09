@@ -105,21 +105,42 @@ def _deg_to_compass(deg: float | None) -> str | None:
 
 # ── WSA scraping ──────────────────────────────────────────────────────────────
 
-def _scrape_wsa() -> dict | None:
-    """
-    Load wsa-ipsach.meteobase.ch with a headless browser and extract
-    wind speed, gust, and direction from the rendered page text.
+def _has_wind_data(text: str) -> bool:
+    return bool(text) and "Wind-10min" in text
 
-    Known page format:
-        Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SW
-        Wind-10min-Max: 10.1km/h (5.5kn, 1Bf) W
 
-    Knot values are read directly from the parentheses.
-    Direction is a German 16-point abbreviation.
-    """
+def _fetch_wsa_requests() -> str:
+    """Try plain HTTP first — fast and no browser needed."""
+    import requests as _req
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    }
+    try:
+        r = _req.get("https://wsa-ipsach.meteobase.ch/",
+                     headers=headers, timeout=15)
+        r.raise_for_status()
+        # Strip HTML tags to get plain text
+        text = re.sub(r"<[^>]+>", " ", r.text)
+        text = re.sub(r"[ \t]+", " ", text).strip()
+        log.info("  WSA via requests (%d chars)", len(text))
+        return text
+    except Exception as exc:
+        log.warning("  WSA requests failed: %s", exc)
+        return ""
+
+
+def _fetch_wsa_playwright() -> str:
+    """Headless browser fallback."""
     if not PLAYWRIGHT_AVAILABLE:
         log.warning("  Playwright not available.")
-        return None
+        return ""
 
     page_text = ""
     try:
@@ -130,8 +151,8 @@ def _scrape_wsa() -> dict | None:
             )
             page = browser.new_page(
                 user_agent=(
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                 )
             )
             try:
@@ -140,7 +161,6 @@ def _scrape_wsa() -> dict | None:
             except Exception as nav_exc:
                 log.warning("  WSA goto warning: %s", nav_exc)
 
-            # Wait for JS to render the wind values
             page.wait_for_timeout(5_000)
 
             try:
@@ -148,6 +168,7 @@ def _scrape_wsa() -> dict | None:
             except Exception:
                 try:
                     page_text = page.content()
+                    page_text = re.sub(r"<[^>]+>", " ", page_text)
                 except Exception:
                     page_text = ""
 
@@ -155,10 +176,31 @@ def _scrape_wsa() -> dict | None:
 
     except Exception as exc:
         log.warning("  WSA Playwright error: %s", exc)
-        return None
+
+    return page_text
+
+
+def _scrape_wsa() -> dict | None:
+    """
+    Fetch wsa-ipsach.meteobase.ch and parse wind values from page text.
+
+    Known page format:
+        Wind-10min-Ø: 4km/h (2.2kn, 1Bf) SW
+        Wind-10min-Max: 10.1km/h (5.5kn, 1Bf) W
+
+    Tries plain HTTP first (fast), falls back to Playwright if blocked.
+    """
+    page_text = _fetch_wsa_requests()
+    if not _has_wind_data(page_text):
+        log.info("  Requests fetch missing wind data, trying Playwright …")
+        page_text = _fetch_wsa_playwright()
 
     if not page_text:
         log.warning("  WSA: empty page text.")
+        return None
+
+    if not _has_wind_data(page_text):
+        log.warning("  WSA: page text has no wind data:\n%s", page_text[:500])
         return None
 
     log.info("  WSA page (%d chars):\n%s", len(page_text), page_text)
