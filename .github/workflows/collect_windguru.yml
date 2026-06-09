@@ -36,6 +36,13 @@ jobs:
       - name: Collect Windguru forecasts
         run: python collect_windguru.py
 
+      - name: Keep workflow alive
+        run: |
+          curl -s -X PUT \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/collect_windguru.yml/enable"
+
       - name: Commit data
         run: |
           git config user.name  "github-actions[bot]"
