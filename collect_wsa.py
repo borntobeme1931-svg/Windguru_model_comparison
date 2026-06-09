@@ -111,29 +111,49 @@ def _has_wind_data(text: str) -> bool:
 
 def _fetch_wsa_requests() -> str:
     """
-    Try curl_cffi first — impersonates a real Chrome browser at TLS level,
-    bypassing Cloudflare and most bot-detection. Falls back to plain requests.
+    Fetch WSA page text through a proxy to bypass GitHub Actions IP block.
+    Tries scrape.do (free proxy) first, then direct curl_cffi, then plain requests.
+    Set SCRAPE_DO_TOKEN env var or repo secret to enable the proxy.
     """
+    import os, html as _html, requests as _req
+
     url = "https://wsa-ipsach.meteobase.ch/"
-    # attempt 1: curl_cffi (TLS fingerprint impersonation)
+
+    def _clean(raw_html: str) -> str:
+        text = re.sub(r"<[^>]+>", " ", raw_html)
+        text = _html.unescape(text)
+        return re.sub(r"[ \t]+", " ", text).strip()
+
+    # attempt 1: scrape.do proxy (routes through residential IP)
+    token = os.environ.get("SCRAPE_DO_TOKEN", "")
+    if token:
+        try:
+            proxy_url = f"http://api.scrape.do?token={token}&url={url}&render=false"
+            r = _req.get(proxy_url, timeout=30)
+            r.raise_for_status()
+            text = _clean(r.text)
+            log.info("  WSA via scrape.do proxy (%d chars)", len(text))
+            return text
+        except Exception as exc:
+            log.warning("  WSA scrape.do failed: %s", exc)
+    else:
+        log.debug("  SCRAPE_DO_TOKEN not set, skipping proxy")
+
+    # attempt 2: curl_cffi (TLS fingerprint impersonation)
     try:
         from curl_cffi import requests as cffi_req
         r = cffi_req.get(url, impersonate="chrome124", timeout=15)
         r.raise_for_status()
-        import html as _html
-        text = re.sub(r"<[^>]+>", " ", r.text)
-        text = _html.unescape(text)
-        text = re.sub(r"[ \t]+", " ", text).strip()
+        text = _clean(r.text)
         log.info("  WSA via curl_cffi (%d chars)", len(text))
         return text
     except ImportError:
-        log.debug("  curl_cffi not available, trying plain requests")
+        log.debug("  curl_cffi not available")
     except Exception as exc:
         log.warning("  WSA curl_cffi failed: %s", exc)
 
-    # attempt 2: plain requests
+    # attempt 3: plain requests
     try:
-        import requests as _req
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -144,10 +164,7 @@ def _fetch_wsa_requests() -> str:
         }
         r = _req.get(url, headers=headers, timeout=15)
         r.raise_for_status()
-        import html as _html
-        text = re.sub(r"<[^>]+>", " ", r.text)
-        text = _html.unescape(text)
-        text = re.sub(r"[ \t]+", " ", text).strip()
+        text = _clean(r.text)
         log.info("  WSA via requests (%d chars)", len(text))
         return text
     except Exception as exc:
