@@ -2,10 +2,10 @@
 """
 Windguru forecast collector
 ============================
-Fetches forecasts (up to 5 days ahead) from all Windguru models
+Fetches forecasts (up to 5 days ahead) from 5 selected Windguru models
 for spot 56996 (Bielersee, Nidau) and appends them to a monthly JSONL file.
 
-Run every 3 hours via GitHub Actions (see .github/workflows/collect.yml).
+Run at 0:10, 6:10, 12:10, 18:10 UTC via GitHub Actions.
 
 Dependencies:
     pip install requests playwright pandas tabulate
@@ -31,6 +31,19 @@ except ImportError:
 # ── configuration ─────────────────────────────────────────────────────────────
 
 WINDGURU_SPOT_ID = 56996
+
+# Only record these five models (matched as case-insensitive substrings)
+TARGET_MODELS = [
+    "icon ch",      # ICON CH 1km
+    "arome",        # Arome FR 1.3km
+    "harm dk",      # HARM DK 2km  (excludes HARMONIE 5km)
+    "ukv",          # UKV 2km
+    "icon 2",       # ICON 2.2km   (avoids matching ICON CH)
+]
+
+def _is_target_model(name: str) -> bool:
+    n = name.lower()
+    return any(t in n for t in TARGET_MODELS)
 
 DATA_DIR      = Path("weather_data")
 FORECASTS_DIR = DATA_DIR / "forecasts"
@@ -193,6 +206,10 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
     for md in model_blocks:
         model_name = (md.get("model_name") or md.get("name") or
                       str(md.get("id_model") or md.get("wgmodel") or "unknown"))
+
+        if not _is_target_model(model_name):
+            log.debug("  Skipping model: %s", model_name)
+            continue
 
         init_dt = None
         raw_init = md.get("initdate") or md.get("init_date")
