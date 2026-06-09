@@ -277,7 +277,7 @@ def save_snapshot(records: list[dict], run_time: datetime) -> None:
     """
     import csv
 
-    fp = SNAPSHOTS_DIR / f"{run_time.strftime('%Y-%m-%dT%H')}.csv"
+    fp = SNAPSHOTS_DIR / f"{run_time.strftime('%Y-%m-%dT%H')}_windguru.csv"
     current_hk = hour_key(run_time)
 
     by_model: dict[str, list[dict]] = {}

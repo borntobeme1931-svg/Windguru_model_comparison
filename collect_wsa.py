@@ -239,7 +239,7 @@ def update_snapshot(obs: dict, run_time: datetime) -> None:
     Add or update the WSA-Ipsach row in the current hour's snapshot CSV.
     The CSV is created by collect_windguru.py; we just append/replace the WSA row.
     """
-    fp = SNAPSHOTS_DIR / f"{run_time.strftime('%Y-%m-%dT%H')}.csv"
+    fp = SNAPSHOTS_DIR / f"{run_time.strftime('%Y-%m-%dT%H')}_wsa.csv"
     FIELDS = ["source", "wind_speed_kn", "wind_gust_kn", "wind_dir_deg", "wind_dir_txt"]
     WSA_SOURCE = "WSA-Ipsach (measured)"
 
