@@ -13,3 +13,10 @@
 2026-06-09 06:20:02,482  INFO        Parsed 474 hourly forecast records across 33 model block(s).
 2026-06-09 06:20:02,484  INFO        Appended 474 forecast records → weather_data/forecasts/2026-06.jsonl
 2026-06-09 06:20:02,484  INFO        Snapshot saved → weather_data/snapshots/2026-06-09T06_windguru.csv  (4 model(s))
+2026-06-09 06:31:21,485  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-09 06:31:44,688  INFO        ✓ Got forecast via Playwright (33 model response(s))
+2026-06-09 06:31:44,688  INFO        ✓ Got 33 model(s) via Playwright
+2026-06-09 06:31:44,688  INFO        Found 33 model block(s). First block keys: ['tabs', 'tabs_hidden', 'spots', 'message']
+2026-06-09 06:31:44,748  INFO        Parsed 474 hourly forecast records across 33 model block(s).
+2026-06-09 06:31:44,750  INFO        Appended 474 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-09 06:31:44,750  INFO        Snapshot saved → weather_data/snapshots/2026-06-09T06_windguru.csv  (4 model(s))
