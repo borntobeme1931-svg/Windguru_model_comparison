@@ -33,16 +33,14 @@ except ImportError:
 WINDGURU_SPOT_ID = 56996
 
 # Only record these five models (matched as case-insensitive substrings)
-# Exact model names as returned by Windguru
-TARGET_MODELS = [
-    "icon-ch 1km",
-    "arome-fr 1.3km",
-    "harm-dk 2km",
-    "ukv 2km",
-    "icon 2.2km",
-]
-
-
+# Exact model names as returned by Windguru (note: space before "km")
+TARGET_MODELS = {
+    "icon-ch 1 km",
+    "arome-fr 1.3 km",
+    "harm-dk 2 km",
+    "ukv 2 km",
+    "icon 2.2 km",
+}
 
 def _is_target_model(name: str) -> bool:
     return name.strip().lower() in TARGET_MODELS
