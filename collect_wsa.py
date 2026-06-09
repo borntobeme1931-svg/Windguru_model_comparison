@@ -120,7 +120,9 @@ def _fetch_wsa_requests() -> str:
         from curl_cffi import requests as cffi_req
         r = cffi_req.get(url, impersonate="chrome124", timeout=15)
         r.raise_for_status()
+        import html as _html
         text = re.sub(r"<[^>]+>", " ", r.text)
+        text = _html.unescape(text)
         text = re.sub(r"[ \t]+", " ", text).strip()
         log.info("  WSA via curl_cffi (%d chars)", len(text))
         return text
@@ -142,7 +144,9 @@ def _fetch_wsa_requests() -> str:
         }
         r = _req.get(url, headers=headers, timeout=15)
         r.raise_for_status()
+        import html as _html
         text = re.sub(r"<[^>]+>", " ", r.text)
+        text = _html.unescape(text)
         text = re.sub(r"[ \t]+", " ", text).strip()
         log.info("  WSA via requests (%d chars)", len(text))
         return text
