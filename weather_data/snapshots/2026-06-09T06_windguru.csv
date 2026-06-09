@@ -1,17 +1,5 @@
 source,wind_speed_kn,wind_gust_kn,wind_dir_deg,wind_dir_txt
-ALADIN 2.3 km,9.8,16.4,217.0,SW
 AROME-AT 2.5 km,4.6,,269.0,W
 AROME-FR 1.3 km,8.3,18.3,213.0,SSW
-GDPS 15 km,6.2,12.5,253.0,WSW
-GFS 13 km,3.9,9.8,257.0,WSW
-HARM-DK 2 km,2.8,4.9,211.0,SSW
-HARMONIE 5 km,5.4,10.2,213.0,SSW
-ICON 13 km,5.6,,238.0,WSW
 ICON 2.2 km,2.4,0.0,180.0,S
-ICON 7 km,5.1,17.7,239.0,WSW
-ICON-2I 2.2 km,3.1,5.2,172.0,S
-ICON-CH 1 km,4.3,8.1,158.0,SSO
-IFS-HRES 9 km,2.5,7.8,188.0,S
 UKV 2 km,3.5,6.6,237.0,WSW
-WRF 9 km,2.4,8.8,163.0,SSO
-Zephr-HD 2.6 km,2.1,3.5,205.0,SSW
