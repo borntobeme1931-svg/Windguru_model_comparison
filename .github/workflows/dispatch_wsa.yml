@@ -1,0 +1,28 @@
+name: Dispatch WSA
+
+on:
+  schedule:
+    - cron: '0,30 * * * *'   # every 30 minutes
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger WSA collection
+        run: |
+          curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/collect_wsa.yml/dispatches" \
+            -d '{"ref":"main"}'
+
+      - name: Keep this workflow alive
+        run: |
+          curl -s -X PUT \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/dispatch_wsa.yml/enable"
