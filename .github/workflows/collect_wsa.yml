@@ -2,7 +2,7 @@ name: Collect WSA measurement
 
 on:
   schedule:
-    - cron: '0,15,30,45 * * * *'   # every 30 minutes
+    - cron: '0,30 * * * *'   # every 30 minutes
   workflow_dispatch:
 
 env:
@@ -40,6 +40,8 @@ jobs:
         run: playwright install-deps chromium
 
       - name: Collect WSA measurement
+        env:
+          SCRAPE_DO_TOKEN: ${{ secrets.SCRAPE_DO_TOKEN }}
         run: python collect_wsa.py
 
       - name: Keep workflow alive
