@@ -33,17 +33,19 @@ except ImportError:
 WINDGURU_SPOT_ID = 56996
 
 # Only record these five models (matched as case-insensitive substrings)
+# Exact model names as returned by Windguru
 TARGET_MODELS = [
-    "icon ch",      # ICON CH 1km
-    "arome",        # Arome FR 1.3km
-    "harm dk",      # HARM DK 2km  (excludes HARMONIE 5km)
-    "ukv",          # UKV 2km
-    "icon 2",       # ICON 2.2km   (avoids matching ICON CH)
+    "icon-ch 1km",
+    "arome-fr 1.3km",
+    "harm-dk 2km",
+    "ukv 2km",
+    "icon 2.2km",
 ]
 
+
+
 def _is_target_model(name: str) -> bool:
-    n = name.lower()
-    return any(t in n for t in TARGET_MODELS)
+    return name.strip().lower() in TARGET_MODELS
 
 DATA_DIR      = Path("weather_data")
 FORECASTS_DIR = DATA_DIR / "forecasts"
@@ -208,7 +210,7 @@ def parse_windguru_forecasts(raw: dict) -> list[dict]:
                       str(md.get("id_model") or md.get("wgmodel") or "unknown"))
 
         if not _is_target_model(model_name):
-            log.debug("  Skipping model: %s", model_name)
+            log.info("  Skipping model: %s", model_name)
             continue
 
         init_dt = None
