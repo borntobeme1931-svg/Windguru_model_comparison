@@ -1,8 +1,6 @@
 name: Collect Windguru forecasts
 
 on:
-  schedule:
-    - cron: '10 0,6,12,18 * * *'   # 4x daily at 0:10, 6:10, 12:10, 18:10 UTC
   workflow_dispatch:
 
 env:
@@ -21,27 +19,26 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dependencies
+        run: pip install requests playwright pandas tabulate
+
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-v1
 
-      - name: Install dependencies
-        run: pip install requests playwright pandas tabulate
-
-      - name: Install Playwright browsers
+      - name: Install Playwright browser (cache miss only)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: playwright install chromium --with-deps
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
 
       - name: Collect Windguru forecasts
         run: python collect_windguru.py
-
-      - name: Keep workflow alive
-        run: |
-          curl -s -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/collect_windguru.yml/enable"
 
       - name: Commit data
         run: |

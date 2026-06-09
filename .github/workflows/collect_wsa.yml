@@ -1,8 +1,6 @@
 name: Collect WSA measurement
 
 on:
-  schedule:
-    - cron: '0,30 * * * *'   # every 30 minutes
   workflow_dispatch:
 
 env:
@@ -21,7 +19,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: pip install requests playwright curl_cffi
 
       - name: Cache Playwright browsers
@@ -43,13 +41,6 @@ jobs:
         env:
           SCRAPE_DO_TOKEN: ${{ secrets.SCRAPE_DO_TOKEN }}
         run: python collect_wsa.py
-
-      - name: Keep workflow alive
-        run: |
-          curl -s -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/collect_wsa.yml/enable"
 
       - name: Commit data
         run: |
