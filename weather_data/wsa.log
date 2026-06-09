@@ -58,3 +58,23 @@ Wassertemperatur: 19.8°C
 2026-06-09 06:09:34,628  INFO        WSA parsed: wind=8.5 kn  gust=14.8 kn  dir=SW (225.0°)
 2026-06-09 06:09:34,629  INFO        Measurement for 2026-06-09T06:00 already recorded — skipping.
 2026-06-09 06:09:34,629  INFO        Snapshot updated → weather_data/snapshots/2026-06-09T06_wsa.csv
+2026-06-09 06:58:24,896  INFO      Fetching WSA-Ipsach measurement …
+2026-06-09 06:58:31,955  INFO        WSA page (247 chars):
+WSA-Ipsach
+
+09.06.2026 (CEST) 08:56 :: 440müM
+
+Wind-10min-Ø: 29.9km/h (16.1kn, 5Bf) WSW
+Wind-10min-Max: 42.5km/h (22.9kn, 5Bf) WSW
+Gust-Factor (GF): 1.9 / Richtungstreue: 96%
+Wassertemperatur: 19.8°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-09 06:58:31,956  INFO        WSA parsed: wind=16.1 kn  gust=22.9 kn  dir=WSW (247.5°)
+2026-06-09 06:58:31,957  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
+2026-06-09 06:58:31,957  INFO        Snapshot updated → weather_data/snapshots/2026-06-09T06_wsa.csv
