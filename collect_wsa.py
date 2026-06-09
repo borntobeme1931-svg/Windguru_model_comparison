@@ -136,16 +136,20 @@ def _scrape_wsa() -> dict | None:
             )
             try:
                 page.goto("https://wsa-ipsach.meteobase.ch/",
-                          wait_until="load", timeout=20_000)
+                          wait_until="domcontentloaded", timeout=30_000)
             except Exception as nav_exc:
                 log.warning("  WSA goto warning: %s", nav_exc)
 
-            page.wait_for_timeout(3_000)
+            # Wait for JS to render the wind values
+            page.wait_for_timeout(5_000)
 
             try:
                 page_text = page.inner_text("body").strip()
             except Exception:
-                page_text = page.content()
+                try:
+                    page_text = page.content()
+                except Exception:
+                    page_text = ""
 
             browser.close()
 
