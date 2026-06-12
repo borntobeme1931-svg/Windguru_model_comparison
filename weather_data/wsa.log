@@ -26104,3 +26104,86 @@ WSA-Ipsach
 2026-06-12 16:45:48,491  INFO        WSA parsed: wind=11.1 kn  gust=15.9 kn  dir=W (270.0°)
 2026-06-12 16:45:48,493  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
 2026-06-12 16:45:48,493  INFO        Snapshot updated → weather_data/snapshots/2026-06-12T16_wsa.csv
+2026-06-12 17:01:12,557  INFO      Fetching WSA-Ipsach measurement …
+2026-06-12 17:01:15,777  INFO        WSA via scrape.do proxy (1035 chars)
+2026-06-12 17:01:15,777  INFO        WSA page (1035 chars):
+WSA-Ipsach 
+ 
+ .bd-placeholder-img {
+ font-size: 1.125rem;
+ text-anchor: middle;
+ -webkit-user-select: none;
+ -moz-user-select: none;
+ user-select: none;
+ }
+ @media (min-width: 768px) {
+ .bd-placeholder-img-lg {
+ font-size: 3.5rem;
+ }
+ }
+ .themed-grid-col {
+ padding-top: .75rem;
+ padding-bottom: .75rem;
+ background-color: rgba(86, 61, 124, .15);
+ border: 1px solid rgba(86, 61, 124, .2);
+ }
+
+ .themed-container {
+ padding: .75rem;
+ margin-bottom: 1.5rem;
+ background-color: rgba(0, 123, 255, .15);
+ border: 1px solid rgba(0, 123, 255, .2);
+ height:500px;
+ }
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ WSA-Ipsach 
+ 12.06.2026 (CEST) 18:56 :: 440müM 
+ 
+
+ 
+ 
+ 
+ Wind-10min-Ø: 16.9km/h (9.1kn, 3Bf) WSW 
+ Wind-10min-Max: 29.5km/h (15.9kn, 3Bf) WSW 
+ Gust-Factor (GF): 2.6 / Richtungstreue: 94% 
+ 
+ 
+ 
+ 
+ 
+ 
+ Wassertemperatur: 18.7°C 
+   
+   
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ © 2026 meteoBase.ch - Version v73 light 
+ 
+ 
+ 
+ 
+ 
+ window.dataLayer = window.dataLayer || [];
+ function gtag(){dataLayer.push(arguments);}
+ gtag('js', new Date());
+ gtag('config', 'G-D57QE69NND');
+2026-06-12 17:01:15,778  INFO        WSA parsed: wind=9.1 kn  gust=15.9 kn  dir=WSW (247.5°)
+2026-06-12 17:01:15,779  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
+2026-06-12 17:01:15,780  INFO        Snapshot updated → weather_data/snapshots/2026-06-12T17_wsa.csv
