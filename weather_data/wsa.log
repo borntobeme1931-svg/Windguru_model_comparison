@@ -44969,3 +44969,25 @@ WSA-Ipsach
 2026-06-15 03:46:08,649  INFO        WSA parsed: wind=1.2 kn  gust=2.5 kn  dir=SSO (157.5°)
 2026-06-15 03:46:08,651  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
 2026-06-15 03:46:08,651  INFO        Snapshot updated → weather_data/snapshots/2026-06-15T03_wsa.csv
+2026-06-15 04:01:24,322  INFO      Fetching WSA-Ipsach measurement …
+2026-06-15 04:01:25,882  INFO        WSA via scrape.do proxy (509 chars)
+2026-06-15 04:01:25,883  INFO        Requests fetch missing wind data, trying Playwright …
+2026-06-15 04:01:34,348  INFO        WSA page (241 chars):
+WSA-Ipsach
+
+15.06.2026 (CEST) 03:36 :: 440müM
+
+Wind-10min-Ø: 2.2km/h (1.2kn, 1Bf) SSO
+Wind-10min-Max: 4.7km/h (2.5kn, 1Bf) SSO
+Gust-Factor (GF): 0 / Richtungstreue: 97%
+Wassertemperatur: 19.7°C
+ 
+ 
+
+
+
+
+© 2026 meteoBase.ch - Version v73 light
+2026-06-15 04:01:34,349  INFO        WSA parsed: wind=1.2 kn  gust=2.5 kn  dir=SSO (157.5°)
+2026-06-15 04:01:34,351  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
+2026-06-15 04:01:34,351  INFO        Snapshot updated → weather_data/snapshots/2026-06-15T04_wsa.csv
