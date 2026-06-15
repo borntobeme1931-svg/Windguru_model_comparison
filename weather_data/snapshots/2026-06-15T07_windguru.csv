@@ -1,0 +1,6 @@
+source,wind_speed_kn,wind_gust_kn,wind_dir_deg,wind_dir_txt
+AROME-FR 1.3 km,1.1,5.7,359.0,N
+HARM-DK 2 km,1.9,2.7,11.0,N
+ICON 2.2 km,2.1,0.0,320.0,NW
+ICON-CH 1 km,1.1,1.5,110.0,OSO
+UKV 2 km,2.3,5.5,348.0,NNW
