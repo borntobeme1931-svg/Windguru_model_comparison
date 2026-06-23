@@ -3328,3 +3328,33 @@
 2026-06-23 01:02:05,539  INFO        Parsed 540 hourly forecast records across 33 model block(s).
 2026-06-23 01:02:05,541  INFO        Appended 540 forecast records → weather_data/forecasts/2026-06.jsonl
 2026-06-23 01:02:05,541  INFO        Snapshot saved → weather_data/snapshots/2026-06-23T01_windguru.csv  (5 model(s))
+2026-06-23 04:01:32,489  INFO      Fetching Windguru forecasts for spot 56996 …
+2026-06-23 04:01:54,599  INFO        ✓ Got forecast via Playwright (33 model response(s))
+2026-06-23 04:01:54,599  INFO        ✓ Got 33 model(s) via Playwright
+2026-06-23 04:01:54,599  INFO        Found 33 model block(s). First block keys: ['tabs', 'tabs_hidden', 'spots', 'message']
+2026-06-23 04:01:54,599  INFO        Skipping model: unknown
+2026-06-23 04:01:54,599  INFO        Skipping model: GDPS 15 km
+2026-06-23 04:01:54,599  INFO        Skipping model: GDPS 15 km
+2026-06-23 04:01:54,599  INFO        Skipping model: IFS-HRES 9 km
+2026-06-23 04:01:54,600  INFO        Skipping model: WRF 9 km
+2026-06-23 04:01:54,600  INFO        Skipping model: IFS-HRES 9 km
+2026-06-23 04:01:54,600  INFO        Skipping model: WRF 9 km
+2026-06-23 04:01:54,618  INFO        Skipping model: ICON 13 km
+2026-06-23 04:01:54,618  INFO        Skipping model: HARMONIE 5 km
+2026-06-23 04:01:54,619  INFO        Skipping model: ICON 13 km
+2026-06-23 04:01:54,619  INFO        Skipping model: HARMONIE 5 km
+2026-06-23 04:01:54,619  INFO        Skipping model: ICON-2I 2.2 km
+2026-06-23 04:01:54,619  INFO        Skipping model: ICON 7 km
+2026-06-23 04:01:54,620  INFO        Skipping model: ICON-2I 2.2 km
+2026-06-23 04:01:54,620  INFO        Skipping model: ICON 7 km
+2026-06-23 04:01:54,620  INFO        Skipping model: GFS 13 km
+2026-06-23 04:01:54,620  INFO        Skipping model: ALADIN 2.3 km
+2026-06-23 04:01:54,620  INFO        Skipping model: GFS 13 km
+2026-06-23 04:01:54,620  INFO        Skipping model: ALADIN 2.3 km
+2026-06-23 04:01:54,621  INFO        Skipping model: Zephr-HD 2.6 km
+2026-06-23 04:01:54,622  INFO        Skipping model: Zephr-HD 2.6 km
+2026-06-23 04:01:54,622  INFO        Skipping model: AROME-AT 2.5 km
+2026-06-23 04:01:54,622  INFO        Skipping model: AROME-AT 2.5 km
+2026-06-23 04:01:54,622  INFO        Parsed 538 hourly forecast records across 33 model block(s).
+2026-06-23 04:01:54,625  INFO        Appended 538 forecast records → weather_data/forecasts/2026-06.jsonl
+2026-06-23 04:01:54,625  INFO        Snapshot saved → weather_data/snapshots/2026-06-23T04_windguru.csv  (5 model(s))
