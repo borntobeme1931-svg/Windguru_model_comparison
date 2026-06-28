@@ -151102,3 +151102,87 @@ WSA-Ipsach
 2026-06-28 22:46:11,923  INFO        WSA parsed: wind=3.9 kn  gust=7.0 kn  dir=OSO (112.5°)
 2026-06-28 22:46:11,930  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
 2026-06-28 22:46:11,930  INFO        Snapshot updated → weather_data/snapshots/2026-06-28T22_wsa.csv
+2026-06-28 23:16:18,238  INFO      Fetching WSA-Ipsach measurement …
+2026-06-28 23:16:19,231  WARNING     WSA scrape.do failed: 401 Client Error: Unauthorized for url: http://api.scrape.do/?token=898719b399744968b10e7ad79dd5c5427a9dc71d17f&url=https://wsa-ipsach.meteobase.ch/&render=false
+2026-06-28 23:16:20,152  INFO        WSA via curl_cffi (1029 chars)
+2026-06-28 23:16:20,152  INFO        WSA page (1029 chars):
+WSA-Ipsach 
+ 
+ .bd-placeholder-img {
+ font-size: 1.125rem;
+ text-anchor: middle;
+ -webkit-user-select: none;
+ -moz-user-select: none;
+ user-select: none;
+ }
+ @media (min-width: 768px) {
+ .bd-placeholder-img-lg {
+ font-size: 3.5rem;
+ }
+ }
+ .themed-grid-col {
+ padding-top: .75rem;
+ padding-bottom: .75rem;
+ background-color: rgba(86, 61, 124, .15);
+ border: 1px solid rgba(86, 61, 124, .2);
+ }
+
+ .themed-container {
+ padding: .75rem;
+ margin-bottom: 1.5rem;
+ background-color: rgba(0, 123, 255, .15);
+ border: 1px solid rgba(0, 123, 255, .2);
+ height:500px;
+ }
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ WSA-Ipsach 
+ 29.06.2026 (CEST) 01:06 :: 440müM 
+ 
+
+ 
+ 
+ 
+ Wind-10min-Ø: 9km/h (4.9kn, 2Bf) OSO 
+ Wind-10min-Max: 14km/h (7.6kn, 2Bf) OSO 
+ Gust-Factor (GF): 2.4 / Richtungstreue: 95% 
+ 
+ 
+ 
+ 
+ 
+ 
+ Wassertemperatur: 28.1°C 
+   
+   
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ © 2026 meteoBase.ch - Version v73 light 
+ 
+ 
+ 
+ 
+ 
+ window.dataLayer = window.dataLayer || [];
+ function gtag(){dataLayer.push(arguments);}
+ gtag('js', new Date());
+ gtag('config', 'G-D57QE69NND');
+2026-06-28 23:16:20,153  INFO        WSA parsed: wind=4.9 kn  gust=7.6 kn  dir=OSO (112.5°)
+2026-06-28 23:16:20,158  INFO        Appended measurement → weather_data/measurements/2026-06.jsonl
+2026-06-28 23:16:20,159  INFO        Snapshot updated → weather_data/snapshots/2026-06-28T23_wsa.csv
