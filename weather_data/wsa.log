@@ -687420,3 +687420,87 @@ WSA-Ipsach
 2026-09-11 10:02:48,814  INFO        WSA parsed: wind=3.5 kn  gust=4.9 kn  dir=WSW (247.5°)
 2026-09-11 10:02:48,818  INFO        Appended measurement → weather_data/measurements/2026-09.jsonl
 2026-09-11 10:02:48,818  INFO        Snapshot updated → weather_data/snapshots/2026-09-11T10_wsa.csv
+2026-09-11 10:17:28,261  INFO      Fetching WSA-Ipsach measurement …
+2026-09-11 10:17:34,705  WARNING     WSA scrape.do failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-09-11 10:17:35,537  INFO        WSA via curl_cffi (1033 chars)
+2026-09-11 10:17:35,537  INFO        WSA page (1033 chars):
+WSA-Ipsach 
+ 
+ .bd-placeholder-img {
+ font-size: 1.125rem;
+ text-anchor: middle;
+ -webkit-user-select: none;
+ -moz-user-select: none;
+ user-select: none;
+ }
+ @media (min-width: 768px) {
+ .bd-placeholder-img-lg {
+ font-size: 3.5rem;
+ }
+ }
+ .themed-grid-col {
+ padding-top: .75rem;
+ padding-bottom: .75rem;
+ background-color: rgba(86, 61, 124, .15);
+ border: 1px solid rgba(86, 61, 124, .2);
+ }
+
+ .themed-container {
+ padding: .75rem;
+ margin-bottom: 1.5rem;
+ background-color: rgba(0, 123, 255, .15);
+ border: 1px solid rgba(0, 123, 255, .2);
+ height:500px;
+ }
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ WSA-Ipsach 
+ 11.09.2026 (CEST) 12:16 :: 440müM 
+ 
+
+ 
+ 
+ 
+ Wind-10min-Ø: 7.9km/h (4.3kn, 2Bf) WSW 
+ Wind-10min-Max: 10.1km/h (5.5kn, 2Bf) WSW 
+ Gust-Factor (GF): 1.7 / Richtungstreue: 96% 
+ 
+ 
+ 
+ 
+ 
+ 
+ Wassertemperatur: 21.2°C 
+   
+   
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ © 2026 meteoBase.ch - Version v73 light 
+ 
+ 
+ 
+ 
+ 
+ window.dataLayer = window.dataLayer || [];
+ function gtag(){dataLayer.push(arguments);}
+ gtag('js', new Date());
+ gtag('config', 'G-D57QE69NND');
+2026-09-11 10:17:35,538  INFO        WSA parsed: wind=4.3 kn  gust=5.5 kn  dir=WSW (247.5°)
+2026-09-11 10:17:35,541  INFO        Appended measurement → weather_data/measurements/2026-09.jsonl
+2026-09-11 10:17:35,541  INFO        Snapshot updated → weather_data/snapshots/2026-09-11T10_wsa.csv
