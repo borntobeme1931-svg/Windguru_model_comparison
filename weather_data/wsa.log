@@ -1122314,3 +1122314,88 @@ WSA-Ipsach
 2026-11-06 19:37:32,265  INFO        WSA parsed: wind=2.9 kn  gust=5.5 kn  dir=OSO (112.5°)
 2026-11-06 19:37:32,268  INFO        Appended measurement → weather_data/measurements/2026-11.jsonl
 2026-11-06 19:37:32,269  INFO        Snapshot updated → weather_data/snapshots/2026-11-06T19_wsa.csv
+2026-11-06 19:49:23,954  INFO      Fetching WSA-Ipsach measurement …
+2026-11-06 19:49:24,628  WARNING     WSA scrape.do failed: 401 Client Error: Unauthorized for url: http://api.scrape.do/?token=898719b399744968b10e7ad79dd5c5427a9dc71d17f&url=https://wsa-ipsach.meteobase.ch/&render=false
+2026-11-06 19:49:39,665  WARNING     WSA curl_cffi failed: Failed to perform, curl: (28) Operation timed out after 15000 milliseconds with 0 bytes received. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+2026-11-06 19:49:40,220  INFO        WSA via requests (1025 chars)
+2026-11-06 19:49:40,221  INFO        WSA page (1025 chars):
+WSA-Ipsach 
+ 
+ .bd-placeholder-img {
+ font-size: 1.125rem;
+ text-anchor: middle;
+ -webkit-user-select: none;
+ -moz-user-select: none;
+ user-select: none;
+ }
+ @media (min-width: 768px) {
+ .bd-placeholder-img-lg {
+ font-size: 3.5rem;
+ }
+ }
+ .themed-grid-col {
+ padding-top: .75rem;
+ padding-bottom: .75rem;
+ background-color: rgba(86, 61, 124, .15);
+ border: 1px solid rgba(86, 61, 124, .2);
+ }
+
+ .themed-container {
+ padding: .75rem;
+ margin-bottom: 1.5rem;
+ background-color: rgba(0, 123, 255, .15);
+ border: 1px solid rgba(0, 123, 255, .2);
+ height:500px;
+ }
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ WSA-Ipsach 
+ 06.11.2026 (CET) 20:47 :: 440müM 
+ 
+
+ 
+ 
+ 
+ Wind-10min-Ø: 4.3km/h (2.3kn, 1Bf) O 
+ Wind-10min-Max: 8.3km/h (4.5kn, 1Bf) O 
+ Gust-Factor (GF): 0 / Richtungstreue: 90% 
+ 
+ 
+ 
+ 
+ 
+ 
+ Wassertemperatur: 11.3°C 
+   
+   
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ © 2026 meteoBase.ch - Version v73 light 
+ 
+ 
+ 
+ 
+ 
+ window.dataLayer = window.dataLayer || [];
+ function gtag(){dataLayer.push(arguments);}
+ gtag('js', new Date());
+ gtag('config', 'G-D57QE69NND');
+2026-11-06 19:49:40,222  INFO        WSA parsed: wind=2.3 kn  gust=4.5 kn  dir=O (90.0°)
+2026-11-06 19:49:40,225  INFO        Appended measurement → weather_data/measurements/2026-11.jsonl
+2026-11-06 19:49:40,226  INFO        Snapshot updated → weather_data/snapshots/2026-11-06T19_wsa.csv
